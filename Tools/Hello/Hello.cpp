@@ -18,7 +18,7 @@ void setup()
 void loop()
 {
     hal.scheduler->delay(1000);
-    hal.console->printf("*\n");
+    hal.console->printf("*I'm say hello to you!\n");
 }
 
 AP_HAL_MAIN();

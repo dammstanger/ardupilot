@@ -25,10 +25,18 @@ void setup()
 
     board_config.init();
 
-    hal.scheduler->delay(1000);
+    hal.scheduler->delay(5000);
+	
+    hal.console->printf("board_config passed.\n");
 
     barometer.init();
+    hal.scheduler->delay(1000);
+
+    hal.console->printf("barometer init passed.\n");
     barometer.calibrate();
+    hal.scheduler->delay(1000);
+	
+    hal.console->printf("barometer calibrate passed.\n");
 
     timer = AP_HAL::micros();
 }
@@ -38,6 +46,8 @@ void loop()
     if (!hal.console->is_initialized()) {
         return;
     }
+
+    hal.console->printf("console is inited.\n");
 
     // run accumulate() at 50Hz and update() at 10Hz
     if ((AP_HAL::micros() - timer) > 20 * 1000UL) {

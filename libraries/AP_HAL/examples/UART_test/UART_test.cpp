@@ -39,6 +39,9 @@ void setup(void)
     setup_uart(hal.uartC, "uartC");  // telemetry 1
     setup_uart(hal.uartD, "uartD");  // telemetry 2
     setup_uart(hal.uartE, "uartE");  // 2nd GPS
+    setup_uart(hal.uartF, "uartF");  // 
+ //   setup_uart(hal.console, "console");  //
+
 }
 
 static void test_uart(AP_HAL::UARTDriver *uart, const char *name)
@@ -48,7 +51,11 @@ static void test_uart(AP_HAL::UARTDriver *uart, const char *name)
         return;
     }
     uart->printf("Hello on UART %s at %.3f seconds\n",
-                 name, (double)(AP_HAL::millis() * 0.001f));
+                name, (double)(AP_HAL::millis() * 0.001f));
+    #ifdef HAL_OS_POSIX_IO
+        uart->printf("hello this board has console.\n");
+    #endif
+    
 }
 
 void loop(void)
@@ -58,13 +65,16 @@ void loop(void)
     test_uart(hal.uartC, "uartC");
     test_uart(hal.uartD, "uartD");
     test_uart(hal.uartE, "uartE");
+    test_uart(hal.uartF, "uartF");
 
     // also do a raw printf() on some platforms, which prints to the
     // debug console
-#if HAL_OS_POSIX_IO
-    ::printf("Hello on debug console at %.3f seconds\n", (double)(AP_HAL::millis() * 0.001f));
-#endif
+//#if HAL_OS_POSIX_IO
+//    ::printf("Hello on debug console at %.3f seconds\n", (double)(AP_HAL::millis() * 0.001f));
+//#endif
+//    ::printf("this message is from console.\n");
 
+    hal.console->printf("hello I'm console.\n");
     hal.scheduler->delay(1000);
 }
 
