@@ -30,11 +30,11 @@ void setup()
     hal.console->printf("board_config passed.\n");
 
     barometer.init();
-    hal.scheduler->delay(1000);
 
     hal.console->printf("barometer init passed.\n");
-    barometer.calibrate();
     hal.scheduler->delay(1000);
+
+//    barometer.calibrate();
 	
     hal.console->printf("barometer calibrate passed.\n");
 
@@ -47,8 +47,6 @@ void loop()
         return;
     }
 
-    hal.console->printf("console is inited.\n");
-
     // run accumulate() at 50Hz and update() at 10Hz
     if ((AP_HAL::micros() - timer) > 20 * 1000UL) {
         timer = AP_HAL::micros();
@@ -59,10 +57,10 @@ void loop()
         counter = 0;
         barometer.update();
         uint32_t read_time = AP_HAL::micros() - timer;
-        if (!barometer.healthy()) {
+/*        if (!barometer.healthy()) {
             hal.console->printf("not healthy\n");
             return;
-        }
+        }*/
         hal.console->printf(" Pressure: %.2f Pa\n"
                             " Temperature: %.2f degC\n"
                             " Relative Altitude: %.2f m\n"
