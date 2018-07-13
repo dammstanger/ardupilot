@@ -14,7 +14,7 @@ void loop();
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 
 /*
-  setup one UART at 57600
+  setup one UART at 115200
  */
 static void setup_uart(AP_HAL::UARTDriver *uart, const char *name)
 {
@@ -22,7 +22,7 @@ static void setup_uart(AP_HAL::UARTDriver *uart, const char *name)
         // that UART doesn't exist on this platform
         return;
     }
-    uart->begin(57600);
+    uart->begin(115200);
 }
 
 
@@ -52,9 +52,7 @@ static void test_uart(AP_HAL::UARTDriver *uart, const char *name)
     }
     uart->printf("Hello on UART %s at %.3f seconds\n",
                 name, (double)(AP_HAL::millis() * 0.001f));
-    #ifdef HAL_OS_POSIX_IO
-        uart->printf("hello this board has console.\n");
-    #endif
+    uart->println("3.1415926\n");
     
 }
 
@@ -73,8 +71,19 @@ void loop(void)
 //    ::printf("Hello on debug console at %.3f seconds\n", (double)(AP_HAL::millis() * 0.001f));
 //#endif
 //    ::printf("this message is from console.\n");
+    char Data[50]={0};
+    int size=hal.uartF->available();
+    int i=0;
 
-    hal.console->printf("hello I'm console.\n");
+    if(size>=50)
+        size = 49;
+    while(size--){
+        Data[i++] = (char)hal.uartF->read();
+    }
+    hal.console->printf("console:uartF rev: %s \n",Data);
+    i = hal.console->txspace();
+    hal.console->printf("console hase: %d Bytes space\n",i);
+    
     hal.scheduler->delay(1000);
 }
 
