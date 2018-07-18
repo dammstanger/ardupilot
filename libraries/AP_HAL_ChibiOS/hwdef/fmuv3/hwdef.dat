@@ -103,8 +103,8 @@ FLASH_SIZE_KB 2048
 # serial device name, and must be for a serial device for which pins
 # are defined in this file. For example, SD7 is for UART7 (SD7 ==
 # "serial device 7" in ChibiOS).
-STDOUT_SERIAL SD7
-STDOUT_BAUDRATE 57600
+#STDOUT_SERIAL SD7
+#STDOUT_BAUDRATE 57600
 
 # now the USB setup, if you have USB. All of these settings are
 # option, and the ones below are the defaults. It ends up creating a
