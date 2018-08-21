@@ -408,6 +408,9 @@ private:
 
     LandStateType land_state = LandStateType_FlyToLocation; // records state of land (flying to location, descending)
 
+    //_agr_inter_mode, flag set true when re/inter agrmode
+    bool _agr_inter_mode;
+
     struct {
         PayloadPlaceStateType state = PayloadPlaceStateType_Calibrating_Hover_Start; // records state of place (descending, releasing, released, ...)
         uint32_t hover_start_timestamp; // milliseconds

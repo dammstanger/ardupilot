@@ -33,15 +33,18 @@ bool Copter::ModeAuto::init(bool ignore_checks)
 
         // stop ROI from carrying over from previous runs of the mission
         // To-Do: reset the yaw as part of auto_wp_start when the previous command was not a wp command to remove the need for this special ROI check
-        if (auto_yaw.mode() == AUTO_YAW_ROI) {
-            auto_yaw.set_mode(AUTO_YAW_HOLD);
-        }
+//        if (auto_yaw.mode() == AUTO_YAW_ROI) {
+//            auto_yaw.set_mode(AUTO_YAW_HOLD);
+//        }
 
         // initialise waypoint and spline controller
         wp_nav->wp_and_spline_init();
 
         // clear guided limits
         copter.mode_guided.limit_clear();
+
+        //set true when  re/inter agrauto mode;
+        _agr_inter_mode = true;
 
         // start/resume the mission (based on MIS_RESTART parameter)
         copter.mission.start_or_resume();
@@ -169,8 +172,17 @@ void Copter::ModeAuto::takeoff_start(const Location& dest_loc)
         return;
     }
 
+    gcs().send_text(MAV_SEVERITY_INFO, "TOFF : _agr_inter_mode= %s ",_agr_inter_mode ? "true":"false");
+
     // initialise yaw
     auto_yaw.set_mode(AUTO_YAW_HOLD);
+//    if(_agr_inter_mode){
+//        _agr_inter_mode = false;
+//        auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
+//    }else{
+//        //set fixed sepcific yaw angle according to way point direction
+//        auto_yaw.set_fixed_yaw(90.0f, 10.0f, 0, false);
+//    }
 
     // clear i term when we're taking off
     set_throttle_takeoff();
@@ -187,11 +199,11 @@ void Copter::ModeAuto::wp_start(const Vector3f& destination)
     // initialise wpnav (no need to check return status because terrain data is not used)
     wp_nav->set_wp_destination(destination, false);
 
-    // initialise yaw
-    // To-Do: reset the yaw only when the previous navigation command is not a WP.  this would allow removing the special check for ROI
-    if (auto_yaw.mode() != AUTO_YAW_ROI) {
-        auto_yaw.set_mode_to_default(false);
-    }
+//    // initialise yaw
+//    // To-Do: reset the yaw only when the previous navigation command is not a WP.  this would allow removing the special check for ROI
+//    if (auto_yaw.mode() != AUTO_YAW_ROI) {
+//        auto_yaw.set_mode_to_default(false);
+//    }
 }
 
 // auto_wp_start - initialises waypoint controller to implement flying to a particular destination
@@ -206,10 +218,19 @@ void Copter::ModeAuto::wp_start(const Location_Class& dest_loc)
         return;
     }
 
-    // initialise yaw
-    // To-Do: reset the yaw only when the previous navigation command is not a WP.  this would allow removing the special check for ROI
-    if (auto_yaw.mode() != AUTO_YAW_ROI) {
-        auto_yaw.set_mode_to_default(false);
+//    // initialise yaw
+//    // To-Do: reset the yaw only when the previous navigation command is not a WP.  this would allow removing the special check for ROI
+//    if (auto_yaw.mode() != AUTO_YAW_ROI) {
+//        auto_yaw.set_mode_to_default(false);
+//    }
+    gcs().send_text(MAV_SEVERITY_INFO, "WP2:_agr_inter_mode= %s ",_agr_inter_mode ? "true":"false");
+
+    if(_agr_inter_mode){
+        _agr_inter_mode = false;
+        auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
+    }else{
+        //set fixed sepcific yaw angle according to way point direction
+        auto_yaw.set_fixed_yaw(90.0f, 10.0f, 0, false);
     }
 }
 
@@ -309,7 +330,7 @@ void Copter::ModeAuto::circle_start()
 // auto_spline_start - initialises waypoint controller to implement flying to a particular destination using the spline controller
 //  seg_end_type can be SEGMENT_END_STOP, SEGMENT_END_STRAIGHT or SEGMENT_END_SPLINE.  If Straight or Spline the next_destination should be provided
 void Copter::ModeAuto::spline_start(const Location_Class& destination, bool stopped_at_start,
-                               AC_WPNav::spline_segment_end_type seg_end_type, 
+                               AC_WPNav::spline_segment_end_type seg_end_type,
                                const Location_Class& next_destination)
 {
     _mode = Auto_Spline;
@@ -321,11 +342,12 @@ void Copter::ModeAuto::spline_start(const Location_Class& destination, bool stop
         return;
     }
 
-    // initialise yaw
-    // To-Do: reset the yaw only when the previous navigation command is not a WP.  this would allow removing the special check for ROI
-    if (auto_yaw.mode() != AUTO_YAW_ROI) {
-        auto_yaw.set_mode_to_default(false);
-    }
+//    // initialise yaw
+//    // To-Do: reset the yaw only when the previous navigation command is not a WP.  this would allow removing the special check for ROI
+//    if (auto_yaw.mode() != AUTO_YAW_ROI) {
+//        auto_yaw.set_mode_to_default(false);
+//    }
+
 }
 
 #if NAV_GUIDED == ENABLED
@@ -455,16 +477,16 @@ bool Copter::ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
     case MAV_CMD_DO_SET_SERVO:
         copter.ServoRelayEvents.do_set_servo(cmd.content.servo.channel, cmd.content.servo.pwm);
         break;
-        
+
     case MAV_CMD_DO_SET_RELAY:
         copter.ServoRelayEvents.do_set_relay(cmd.content.relay.num, cmd.content.relay.state);
         break;
-        
+
     case MAV_CMD_DO_REPEAT_SERVO:
         copter.ServoRelayEvents.do_repeat_servo(cmd.content.repeat_servo.channel, cmd.content.repeat_servo.pwm,
                                          cmd.content.repeat_servo.repeat_count, cmd.content.repeat_servo.cycle_time * 1000.0f);
         break;
-        
+
     case MAV_CMD_DO_REPEAT_RELAY:
         copter.ServoRelayEvents.do_repeat_relay(cmd.content.repeat_relay.num, cmd.content.repeat_relay.repeat_count,
                                          cmd.content.repeat_relay.cycle_time * 1000.0f);
@@ -479,7 +501,7 @@ bool Copter::ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
         // point the camera to a specified angle
         do_mount_control(cmd);
         break;
-    
+
     case MAV_CMD_DO_FENCE_ENABLE:
 #if AC_FENCE == ENABLED
         if (cmd.p1 == 0) { //disable
@@ -871,7 +893,7 @@ void Copter::ModeAuto::land_run()
 
     // set motors to full range
     motors->set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
-    
+
     land_run_horizontal_control();
     land_run_vertical_control();
 }
@@ -1094,11 +1116,11 @@ void Copter::ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd)
     // Set wp navigation target
     wp_start(target_loc);
 
-    // if no delay as well as not final waypoint set the waypoint as "fast"
-    AP_Mission::Mission_Command temp_cmd;
-    if (loiter_time_max == 0 && copter.mission.get_next_nav_cmd(cmd.index+1, temp_cmd)) {
-        copter.wp_nav->set_fast_waypoint(true);
-    }
+//    // if no delay as well as not final waypoint set the waypoint as "fast"
+//    AP_Mission::Mission_Command temp_cmd;
+//    if (loiter_time_max == 0 && copter.mission.get_next_nav_cmd(cmd.index+1, temp_cmd)) {
+//        copter.wp_nav->set_fast_waypoint(true);
+//    }
 }
 
 // do_land - initiate landing procedure
@@ -1229,7 +1251,8 @@ void Copter::ModeAuto::do_spline_wp(const AP_Mission::Mission_Command& cmd)
     // this will be used to remember the time in millis after we reach or pass the WP.
     loiter_time = 0;
     // this is the delay, stored in seconds
-    loiter_time_max = cmd.p1;
+//    loiter_time_max = cmd.p1;
+    loiter_time_max = 1;
 
     // determine segment start and end type
     bool stopped_at_start = true;
