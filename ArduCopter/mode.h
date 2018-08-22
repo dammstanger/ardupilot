@@ -411,6 +411,9 @@ private:
     //_agr_inter_mode, flag set true when re/inter agrmode
     bool _agr_inter_mode;
 
+    //keep the yaw of agriculture working wp
+    int32_t _agr_yaw_cd;
+
     struct {
         PayloadPlaceStateType state = PayloadPlaceStateType_Calibrating_Hover_Start; // records state of place (descending, releasing, released, ...)
         uint32_t hover_start_timestamp; // milliseconds

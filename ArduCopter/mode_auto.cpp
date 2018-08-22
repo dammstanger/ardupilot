@@ -37,6 +37,27 @@ bool Copter::ModeAuto::init(bool ignore_checks)
 //            auto_yaw.set_mode(AUTO_YAW_HOLD);
 //        }
 
+        //calculate the yaw used to agriculture working according to first two working wp in the mission
+        Location_Class loc[2];
+        AP_Mission::Mission_Command temp_cmd;
+        uint8_t cnt=0;
+        uint8_t temp_index=1;
+        do{
+            if(copter.mission.read_cmd_from_storage(temp_index++, temp_cmd)){
+                if (temp_cmd.id==MAV_CMD_NAV_WAYPOINT || temp_cmd.id==MAV_CMD_NAV_SPLINE_WAYPOINT) {
+                    loc[cnt++] = temp_cmd.content.location;
+                }
+            }else{
+                break;
+            }
+        }while(cnt<2);
+
+        if(cnt==2){
+            _agr_yaw_cd = get_bearing_cd(loc[0], loc[1]);
+        }else{
+            _agr_yaw_cd = 0;
+        }
+
         // initialise waypoint and spline controller
         wp_nav->wp_and_spline_init();
 
@@ -176,13 +197,6 @@ void Copter::ModeAuto::takeoff_start(const Location& dest_loc)
 
     // initialise yaw
     auto_yaw.set_mode(AUTO_YAW_HOLD);
-//    if(_agr_inter_mode){
-//        _agr_inter_mode = false;
-//        auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
-//    }else{
-//        //set fixed sepcific yaw angle according to way point direction
-//        auto_yaw.set_fixed_yaw(90.0f, 10.0f, 0, false);
-//    }
 
     // clear i term when we're taking off
     set_throttle_takeoff();
@@ -218,11 +232,6 @@ void Copter::ModeAuto::wp_start(const Location_Class& dest_loc)
         return;
     }
 
-//    // initialise yaw
-//    // To-Do: reset the yaw only when the previous navigation command is not a WP.  this would allow removing the special check for ROI
-//    if (auto_yaw.mode() != AUTO_YAW_ROI) {
-//        auto_yaw.set_mode_to_default(false);
-//    }
     gcs().send_text(MAV_SEVERITY_INFO, "WP2:_agr_inter_mode= %s ",_agr_inter_mode ? "true":"false");
 
     if(_agr_inter_mode){
@@ -230,7 +239,7 @@ void Copter::ModeAuto::wp_start(const Location_Class& dest_loc)
         auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
     }else{
         //set fixed sepcific yaw angle according to way point direction
-        auto_yaw.set_fixed_yaw(90.0f, 10.0f, 0, false);
+        auto_yaw.set_fixed_yaw(_agr_yaw_cd/100.0f, 10.0f, 0, false);
     }
 }
 
