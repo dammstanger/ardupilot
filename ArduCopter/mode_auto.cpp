@@ -58,6 +58,16 @@ bool Copter::ModeAuto::init(bool ignore_checks)
             _agr_yaw_cd = 0;
         }
 
+//        // end Command  : waypoint
+//        temp_cmd.id = MAV_CMD_NAV_LOITER_TIME;
+//        temp_cmd.p1 = 1;
+//        temp_cmd.content.location.alt = 1500;           //cm,
+//        temp_cmd.content.location.lat = 0;                  //lat=lng=0 loiter in current positon
+//        temp_cmd.content.location.lng = 0;
+//        if (!copter.mission.add_cmd(temp_cmd)) {
+//            gcs().send_text(MAV_SEVERITY_WARNING, "add command failed.");
+//        }
+
         // initialise waypoint and spline controller
         wp_nav->wp_and_spline_init();
 
@@ -456,7 +466,6 @@ bool Copter::ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
     case MAV_CMD_NAV_DELAY:                    // 94 Delay the next navigation command
         do_nav_delay(cmd);
         break;
-
     //
     // conditional commands
     //
@@ -1188,6 +1197,7 @@ void Copter::ModeAuto::do_loiter_unlimited(const AP_Mission::Mission_Command& cm
     // start way point navigator and provide it the desired location
     wp_start(target_loc);
 }
+
 
 // do_circle - initiate moving in a circle
 void Copter::ModeAuto::do_circle(const AP_Mission::Mission_Command& cmd)
