@@ -257,6 +257,106 @@ private:
 
 };
 
+#if MODE_ABZZ_ENABLED == ENABLED
+class ModeABZz : public Mode {
+
+public:
+    // inherit constructor
+    using Copter::Mode::Mode;
+
+    ModeABZz(void):
+        _point_a(Location_Class(225746990,1144842990, 500, Location_Class::ALT_FRAME_ABOVE_HOME)),
+        _point_b(Location_Class(225749380,1144841840, 500, Location_Class::ALT_FRAME_ABOVE_HOME)),
+        _shift_width_cm(400)
+        {}
+    bool init(bool ignore_checks) override;
+    void run() override;
+
+    bool is_autopilot() const override { return true; }
+    bool requires_GPS() const override { return true; }
+    bool has_manual_throttle() const override { return false; }
+    bool allows_arming(bool from_gcs) const override { return false; };
+
+    // Abzz
+//    AbzzMode mode() const { return _mode; }
+    void update_abwp_sta();
+
+    void wp_start(const Vector3f& destination);
+    void wp_start(const Location_Class& dest_loc);
+
+    void spline_start(const Vector3f& destination, bool stopped_at_start, AC_WPNav::spline_segment_end_type seg_end_type, const Vector3f& next_spline_destination);
+    void spline_start(const Location_Class& destination, bool stopped_at_start, AC_WPNav::spline_segment_end_type seg_end_type, const Location_Class& next_destination);
+
+
+    // return true if this flight mode supports user takeoff
+    //  must_nagivate is true if mode must also control horizontal position
+    virtual bool has_user_takeoff(bool must_navigate) const { return false; }
+
+
+
+protected:
+
+    const char *name() const override { return "ABZZ"; }
+    const char *name4() const override { return "ABZZ"; }
+
+    uint32_t wp_distance() const override;
+    int32_t wp_bearing() const override;
+    float crosstrack_error() const override { return wp_nav->crosstrack_error();}
+    bool get_wp(Location_Class &loc) override;
+//    void run_autopilot() override;
+
+private:
+    void generate_next_abline();
+    void generate_abline(uint16_t shift_cnt);
+    void wp_run();
+    void spline_run();
+
+//    bool verify_takeoff();
+//    bool verify_RTL();
+    bool verify_nav_wp(void);
+//    bool verify_spline_wp(const AP_Mission::Mission_Command& cmd);
+
+    typedef enum{
+        NONE_CMPLT=0,
+        A_POINT_CMPLT,
+        AB_POINT_CMPLT
+    }ABsample_sta_eu;
+
+    typedef enum{
+        Start = 0,
+        Resume,
+        AToB,
+        BToA,
+        GotoA,
+        GotoBrake
+    }ABwp_sta_eu;
+
+    struct{
+        uint8_t ab_bearing_set:1;        //true if the bearing of ab point is set
+    }_flags;
+
+    AbzzMode _mode = Abzz_WP;   // controls which auto controller is run
+    Location_Class _point_a;
+    Location_Class _point_b;
+    Location_Class _point_shift_a;
+    Location_Class _point_shift_b;
+    uint16_t _shift_count = 0;
+    ABsample_sta_eu _point_ab_sta = AB_POINT_CMPLT;
+    ABwp_sta_eu _abwp_sta = AToB;
+    float _ab_bearing_deg;
+    uint16_t _shift_width_cm;
+    uint8_t shift_direction_cw = 1;
+    // Loiter control
+    uint16_t loiter_time_max;                // How long we should stay in Loiter Mode for mission scripting (time in seconds)
+    uint32_t loiter_time;                    // How long have we been loitering - The start time in millis
+
+//    Location_Class terrain_adjusted_location(const AP_Mission::Mission_Command& cmd) const;
+
+//    void auto_spline_start(const Location_Class& destination, bool stopped_at_start, AC_WPNav::spline_segment_end_type seg_end_type, const Location_Class& next_destination);
+
+
+};
+#endif
 
 class ModeAuto : public Mode {
 
