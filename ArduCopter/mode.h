@@ -130,6 +130,7 @@ protected:
     RC_Channel *&channel_pitch;
     RC_Channel *&channel_throttle;
     RC_Channel *&channel_yaw;
+    RC_Channel *&channel_speed;
     float &G_Dt;
     ap_t &ap;
 
@@ -265,8 +266,8 @@ public:
     using Copter::Mode::Mode;
 
     ModeABZz(void):
-        _point_a(Location_Class(225746990,1144842990, 500, Location_Class::ALT_FRAME_ABOVE_HOME)),
-        _point_b(Location_Class(225749380,1144841840, 500, Location_Class::ALT_FRAME_ABOVE_HOME)),
+//        _point_a(Location_Class(225746990,1144842990, 500, Location_Class::ALT_FRAME_ABOVE_HOME)),
+//        _point_b(Location_Class(225749380,1144841840, 500, Location_Class::ALT_FRAME_ABOVE_HOME)),
         _shift_width_cm(400)
         {}
     bool init(bool ignore_checks) override;
@@ -278,11 +279,17 @@ public:
     bool allows_arming(bool from_gcs) const override { return false; };
 
     // Abzz
-//    AbzzMode mode() const { return _mode; }
+    //    AbzzMode mode() const { return _mode; }
     void update_abwp_sta();
+    void save_ab_point(uint8_t get_b);
+    void change_shiftwidth(uint16_t new_width_cm);
+    void save_ab_shiftdir();
+    void set_cmd_auto(int8_t flag_auto);
+    void set_cmd_endmission(int8_t flag_end);
 
-    void wp_start(const Vector3f& destination);
-    void wp_start(const Location_Class& dest_loc);
+
+    bool wp_start(const Vector3f& destination);
+    bool wp_start(const Location_Class& dest_loc);
 
     void spline_start(const Vector3f& destination, bool stopped_at_start, AC_WPNav::spline_segment_end_type seg_end_type, const Vector3f& next_spline_destination);
     void spline_start(const Location_Class& destination, bool stopped_at_start, AC_WPNav::spline_segment_end_type seg_end_type, const Location_Class& next_destination);
@@ -303,13 +310,19 @@ protected:
     int32_t wp_bearing() const override;
     float crosstrack_error() const override { return wp_nav->crosstrack_error();}
     bool get_wp(Location_Class &loc) override;
-//    void run_autopilot() override;
+    void run_autopilot() override;
 
 private:
+    void manual_start();
+    void calc_ab_bearing();
     void generate_next_abline();
     void generate_abline(uint16_t shift_cnt);
+    void reset_mission();
+    void do_exit_auto();
     void wp_run();
     void spline_run();
+    void manual_control_run();
+
 
 //    bool verify_takeoff();
 //    bool verify_RTL();
@@ -317,35 +330,44 @@ private:
 //    bool verify_spline_wp(const AP_Mission::Mission_Command& cmd);
 
     typedef enum{
-        NONE_CMPLT=0,
-        A_POINT_CMPLT,
+        SAMPLE_A=0,
+        SAMPLE_B,
+        SEL_SHIFT_DIR,
         AB_POINT_CMPLT
     }ABsample_sta_eu;
 
     typedef enum{
         Start = 0,
-        Resume,
+        Suspend,
+        GotoWork,
         AToB,
         BToA,
-        GotoA,
-        GotoBrake
-    }ABwp_sta_eu;
+        Brake
+    }ABzz_sta_eu;
+
+    bool _cmd_auto = false;                    //true if receive a auto command from app
+    bool _cmd_endmission = false;       //true if receive a end command from app
+
 
     struct{
         uint8_t ab_bearing_set:1;        //true if the bearing of ab point is set
+        uint8_t ab_brearing_reverse:1;      //true if A and B point is reverse from the origin sampled
     }_flags;
 
-    AbzzMode _mode = Abzz_WP;   // controls which auto controller is run
+    AbzzMode _mode = Abzz_Manual;   // controls which auto controller is run
     Location_Class _point_a;
     Location_Class _point_b;
     Location_Class _point_shift_a;
     Location_Class _point_shift_b;
+    Location_Class _point_break;
     uint16_t _shift_count = 0;
-    ABsample_sta_eu _point_ab_sta = AB_POINT_CMPLT;
-    ABwp_sta_eu _abwp_sta = AToB;
+    ABsample_sta_eu _sta_absetting = SAMPLE_A;
+    ABzz_sta_eu _sta_abzz = Start;
     float _ab_bearing_deg;
     uint16_t _shift_width_cm;
-    uint8_t shift_direction_cw = 1;
+    uint8_t _shift_direction_cw = 1;
+    uint16_t _speed_last;
+
     // Loiter control
     uint16_t loiter_time_max;                // How long we should stay in Loiter Mode for mission scripting (time in seconds)
     uint32_t loiter_time;                    // How long have we been loitering - The start time in millis
@@ -1343,4 +1365,49 @@ protected:
     const char *name4() const override { return "FOLL"; }
 
     uint32_t last_log_ms;   // system time of last time desired velocity was logging
+};
+
+class ModeZigZag : public Mode {
+
+public:
+
+    // inherit constructor
+    using Copter::Mode::Mode;
+
+    bool init(bool ignore_checks) override;
+    void run() override;
+
+    bool requires_GPS() const override { return true; }
+    bool has_manual_throttle() const override { return false; }
+    bool allows_arming(bool from_gcs) const override { return false; }
+    bool is_autopilot() const override { return true; }
+
+    // save current position as A (dest_num = 0) or B (dest_num = 1).  If both A and B have been saved move to the one specified
+    void save_or_move_to_destination(uint8_t dest_num);
+
+    // return manual control to the pilot
+    void return_to_manual_control();
+
+protected:
+
+    const char *name() const override { return "ZIGZAG"; }
+    const char *name4() const override { return "ZIGZ"; }
+
+private:
+
+    void auto_control();
+    void manual_control();
+    bool reached_destination();
+    bool calculate_next_dest(uint8_t position_num, Vector3f& next_dest) const;
+
+    Vector2f dest_A;    // in NEU frame in cm relative to ekf origin
+    Vector2f dest_B;    // in NEU frame in cm relative to ekf origin
+
+    enum zigzag_state {
+        STORING_POINTS, // storing points A and B, pilot has manual control
+        AUTO,           // after A and B defined, pilot toggle the switch from one side to the other, vehicle flies autonomously
+        MANUAL_REGAIN   // pilot toggle the switch to middle position, has manual control
+    } stage;
+
+    uint32_t reach_wp_time_ms = 0;  // time since vehicle reached destination (or zero if not yet reached)
 };

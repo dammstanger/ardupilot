@@ -136,9 +136,21 @@ enum tuning_func {
 #define WP_YAW_BEHAVIOR_LOOK_AHEAD                    3   // auto pilot will look ahead during missions and rtl (primarily meant for traditional helicopters)
 
 
+//mode agriculture relative commands
+enum AgrCmd {
+    Cmd_OnOffMission,
+    Cmd_OnOffAuto,
+    Cmd_SampleA,
+    Cmd_SampleB,
+    Cmd_ShiftDir,
+    Cmd_ShiftWidth,
+    Cmd_ABLineRev,
+    Cmd_BrkPoint,
+};
+
 // abzz modes
 enum AbzzMode {
-    Abzz_TakeOff,
+    Abzz_Manual,
     Abzz_WP,
     Abzz_RTL,
     Abzz_Spline,
