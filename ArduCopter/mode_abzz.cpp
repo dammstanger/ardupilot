@@ -110,6 +110,15 @@ void Copter::ModeABZz::update_abwp_sta()
             if(!_flags.ab_bearing_set){
                 calc_ab_bearing();
             }
+            //update loiter timer
+            if(get_distance_cm(copter.current_loc, _point_shift_a)< ABZZ_WP_RADIUS_CM){
+                loiter_time_max = 2;
+            }
+            else{
+                loiter_time_max = 1;
+            }
+            loiter_time = 0;
+
              auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
 
             //set start point and line cnt
@@ -156,6 +165,14 @@ void Copter::ModeABZz::update_abwp_sta()
         //execute app start or resume command is update
         if(_cmd_auto){
 
+             if(get_distance_cm(copter.current_loc, _point_break)< ABZZ_WP_RADIUS_CM){
+                 loiter_time_max = 2;
+             }
+             else{
+                 loiter_time_max = 1;
+             }
+             loiter_time = 0;
+
              auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
 
              wp_nav->wp_and_spline_init();
@@ -177,11 +194,12 @@ void Copter::ModeABZz::update_abwp_sta()
             Location_Class dest(copter.wp_nav->get_wp_destination());
 
             if(get_distance_cm(copter.current_loc, dest)< ABZZ_WP_RADIUS_CM){
-                 loiter_time_max = 3;
-            }
-            else{
                 loiter_time_max = 2;
             }
+            else{
+                loiter_time_max = 1;
+            }
+            loiter_time = 0;
          //set fixed sepcific yaw angle according to way point direction
             auto_yaw.set_fixed_yaw(_ab_bearing_deg, 20.0f, 0, false);
             copter.wp_nav->set_speed_xy(_speed_last);
@@ -202,7 +220,8 @@ void Copter::ModeABZz::update_abwp_sta()
 
             auto_yaw.set_mode(AUTO_YAW_FIXED);
 
-            loiter_time_max = 2;
+            loiter_time_max = 1;
+            loiter_time = 0;
             copter.wp_nav->set_wp_destination(_point_shift_a);
             _sta_abzz = BToA;
         }
@@ -218,7 +237,8 @@ void Copter::ModeABZz::update_abwp_sta()
         if(wp_complete){
             auto_yaw.set_mode(AUTO_YAW_FIXED);
             gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: BtoA finish");
-            loiter_time_max = 2;
+            loiter_time_max = 1;
+            loiter_time = 0;
             copter.wp_nav->set_wp_destination(_point_shift_b);
             _sta_abzz = AToB;
         }
@@ -246,7 +266,7 @@ void Copter::ModeABZz::update_abwp_sta()
             gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=300");
         }else if(ch_spd>=500 && ch_spd <750){
             section = 500;
-            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=500");
+//            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=500");
         }else if(ch_spd>=750){
             section = 700;
             gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=700");
@@ -303,13 +323,16 @@ void Copter::ModeABZz::set_cmd_endmission(int8_t flag_end)
 
 void Copter::ModeABZz::save_ab_point(uint8_t get_b)
 {
-
+    //save AB point in above ekf origin altitude frame
     if(!get_b && _sta_absetting == SAMPLE_A){
         _point_a = copter.current_loc;
+//        _point_a.change_alt_frame(Location_Class::ALT_FRAME_ABOVE_ORIGIN);
         _sta_absetting = SAMPLE_B;
         gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: point A stored");
-    }else if(_sta_absetting == SAMPLE_B){
+
+    }else if(get_b && _sta_absetting == SAMPLE_B){
         _point_b = copter.current_loc;
+//        _point_b.change_alt_frame(Location_Class::ALT_FRAME_ABOVE_ORIGIN);
         _sta_absetting = SEL_SHIFT_DIR;
         gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: point B stored");
     }
@@ -426,6 +449,7 @@ bool Copter::ModeABZz::wp_start(const Location_Class& dest_loc)
 {
 
     copter.wp_nav->set_speed_xy(500);
+
     // send target to waypoint controller
     if (!wp_nav->set_wp_destination(dest_loc)) {
         // failure to set destination can only be because of missing terrain data
@@ -438,7 +462,6 @@ bool Copter::ModeABZz::wp_start(const Location_Class& dest_loc)
 
 
 }
-
 
 // auto_spline_start - initialises waypoint controller to implement flying to a particular destination using the spline controller
 //  seg_end_type can be SEGMENT_END_STOP, SEGMENT_END_STRAIGHT or SEGMENT_END_SPLINE.  If Straight or Spline the next_destination should be provided
@@ -482,11 +505,64 @@ bool Copter::ModeABZz::get_wp(Location_Class& destination)
     }
 }
 
+// manual_control - process manual control
+void Copter::ModeABZz::manual_control_run()
+{
+    float target_yaw_rate = 0.0f;
+    float target_climb_rate = 0.0f;
+
+    // process pilot inputs unless we are in radio failsafe
+    if (!copter.failsafe.radio) {
+        float target_roll, target_pitch;
+        // apply SIMPLE mode transform to pilot inputs
+        update_simple_mode();
+
+        // convert pilot input to lean angles
+        get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), attitude_control->get_althold_lean_angle_max());
+
+        // process pilot's roll and pitch input
+        loiter_nav->set_pilot_desired_acceleration(target_roll, target_pitch, G_Dt);
+        // get pilot's desired yaw rate
+        target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
+
+        // get pilot desired climb rate
+        target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
+        // make sure the climb rate is in the given range, prevent floating point errors
+        target_climb_rate = constrain_float(target_climb_rate, -get_pilot_speed_dn(), g.pilot_speed_up);
+    } else {
+        // clear out pilot desired acceleration in case radio failsafe event occurs and we
+        // do not switch to RTL for some reason
+        loiter_nav->clear_pilot_desired_acceleration();
+    }
+
+    // set motors to full range
+    motors->set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
+
+    // run loiter controller
+    loiter_nav->update(ekfGndSpdLimit, ekfNavVelGainScaler);
+
+    // call attitude controller
+    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(loiter_nav->get_roll(), loiter_nav->get_pitch(), target_yaw_rate);
+
+    // adjust climb rate using rangefinder
+    target_climb_rate = get_surface_tracking_climb_rate(target_climb_rate, pos_control->get_alt_target(), G_Dt);
+
+    // get avoidance adjusted climb rate
+    target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);
+
+    // update altitude target and call position controller
+    pos_control->set_alt_target_from_climb_rate_ff(target_climb_rate, G_Dt, false);
+
+    // adjusts target up or down using a climb rate
+    pos_control->update_z_controller();
+}
+
 
 // auto_wp_run - runs the auto waypoint controller
 //      called by auto_run at 100hz or more
 void Copter::ModeABZz::wp_run()
 {
+
     // if not auto armed or motor interlock not enabled set throttle to zero and exit immediately
     if (!motors->armed() || !ap.auto_armed || !motors->get_interlock()) {
         // To-Do: reset waypoint origin to current location because copter is probably on the ground so we don't want it lurching left or right on take-off
@@ -569,57 +645,6 @@ void Copter::ModeABZz::spline_run()
     }
 }
 
-// manual_control - process manual control
-void Copter::ModeABZz::manual_control_run()
-{
-    float target_yaw_rate = 0.0f;
-    float target_climb_rate = 0.0f;
-
-    // process pilot inputs unless we are in radio failsafe
-    if (!copter.failsafe.radio) {
-        float target_roll, target_pitch;
-        // apply SIMPLE mode transform to pilot inputs
-        update_simple_mode();
-
-        // convert pilot input to lean angles
-        get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), attitude_control->get_althold_lean_angle_max());
-
-        // process pilot's roll and pitch input
-        loiter_nav->set_pilot_desired_acceleration(target_roll, target_pitch, G_Dt);
-        // get pilot's desired yaw rate
-        target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
-
-        // get pilot desired climb rate
-        target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
-        // make sure the climb rate is in the given range, prevent floating point errors
-        target_climb_rate = constrain_float(target_climb_rate, -get_pilot_speed_dn(), g.pilot_speed_up);
-    } else {
-        // clear out pilot desired acceleration in case radio failsafe event occurs and we
-        // do not switch to RTL for some reason
-        loiter_nav->clear_pilot_desired_acceleration();
-    }
-
-    // set motors to full range
-    motors->set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
-
-    // run loiter controller
-    loiter_nav->update(ekfGndSpdLimit, ekfNavVelGainScaler);
-
-    // call attitude controller
-    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(loiter_nav->get_roll(), loiter_nav->get_pitch(), target_yaw_rate);
-
-    // adjust climb rate using rangefinder
-    target_climb_rate = get_surface_tracking_climb_rate(target_climb_rate, pos_control->get_alt_target(), G_Dt);
-
-    // get avoidance adjusted climb rate
-    target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);
-
-    // update altitude target and call position controller
-    pos_control->set_alt_target_from_climb_rate_ff(target_climb_rate, G_Dt, false);
-
-    // adjusts target up or down using a climb rate
-    pos_control->update_z_controller();
-}
 
 // terrain_adjusted_location: returns a Location with lat/lon from cmd
 // and altitude from our current altitude adjusted for location
