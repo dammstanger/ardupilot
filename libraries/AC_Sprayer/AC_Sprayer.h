@@ -21,12 +21,22 @@
 #include <SRV_Channel/SRV_Channel.h>
 #include <AP_AHRS/AP_AHRS.h>
 
-#define AC_SPRAYER_DEFAULT_PUMP_RATE        10.0f   ///< default quantity of spray per meter travelled
-#define AC_SPRAYER_DEFAULT_PUMP_MIN         0       ///< default minimum pump speed expressed as a percentage from 0 to 100
+#define AC_SPRAYER_DEFAULT_PUMP_MIN_PWM    1100
+#define AC_SPRAYER_DEFAULT_PUMP_STOP_PWM    1200
+#define AC_SPRAYER_DEFAULT_PUMP_MAX_PWM    1900
+#define AC_SPRAYER_DEFAULT_PUMP_RATE        7.0f   /// (MAX - STOP) /100 default quantity of spray per meter travelled
+#define AC_SPRAYER_DEFAULT_PUMP_MIN         15.0f    ///  default minimum pump speed expressed as a percentage from 0 to 100
 #define AC_SPRAYER_DEFAULT_SPINNER_PWM      1300    ///< default speed of spinner (higher means spray is throw further horizontally
 #define AC_SPRAYER_DEFAULT_SPEED_MIN        100     ///< we must be travelling at least 1m/s to begin spraying
 #define AC_SPRAYER_DEFAULT_TURN_ON_DELAY    100     ///< delay between when we reach the minimum speed and we begin spraying.  This reduces the likelihood of constantly turning on/off the pump
 #define AC_SPRAYER_DEFAULT_SHUT_OFF_DELAY   1000    ///< shut-off delay in milli seconds.  This reduces the likelihood of constantly turning on/off the pump
+
+//#define AC_SPRAYER_DEFAULT_PUMP_RATE        10.0f   ///< default quantity of spray per meter travelled
+//#define AC_SPRAYER_DEFAULT_PUMP_MIN         0       ///< default minimum pump speed expressed as a percentage from 0 to 100
+//#define AC_SPRAYER_DEFAULT_SPINNER_PWM      1300    ///< default speed of spinner (higher means spray is throw further horizontally
+//#define AC_SPRAYER_DEFAULT_SPEED_MIN        100     ///< we must be travelling at least 1m/s to begin spraying
+//#define AC_SPRAYER_DEFAULT_TURN_ON_DELAY    100     ///< delay between when we reach the minimum speed and we begin spraying.  This reduces the likelihood of constantly turning on/off the pump
+//#define AC_SPRAYER_DEFAULT_SHUT_OFF_DELAY   1000    ///< shut-off delay in milli seconds.  This reduces the likelihood of constantly turning on/off the pump
 
 /// @class  AC_Sprayer
 /// @brief  Object managing a crop sprayer comprised of a spinner and a pump both controlled by pwm
@@ -40,6 +50,8 @@ public:
 
     /// run - allow or disallow spraying to occur
     void run(bool true_false);
+
+    void change_pump_speed(const int8_t val);
 
     /// running - returns true if spraying is currently permitted
     bool running() const { return _flags.running; }
@@ -66,19 +78,30 @@ private:
     AP_Int8         _enabled;               ///< top level enable/disable control
     AP_Float        _pump_pct_1ms;          ///< desired pump rate (expressed as a percentage of top rate) when travelling at 1m/s
     AP_Int8         _pump_min_pct;          ///< minimum pump rate (expressed as a percentage from 0 to 100)
+//    AP_Float        _pump_pct_1ms;          ///< desired pump rate (expressed as a percentage of top rate) when travelling at 1m/s
+//    AP_Int8         _pump_min_pct;          ///< minimum pump rate (expressed as a percentage from 0 to 100)
     AP_Int16        _spinner_pwm;           ///< pwm rate of spinner
     AP_Float        _speed_min;             ///< minimum speed in cm/s above which the sprayer will be started
 
     /// flag bitmask
     struct sprayer_flags_type {
+        uint8_t inited          :1;
         uint8_t spraying    : 1;            ///< 1 if we are currently spraying
         uint8_t testing     : 1;            ///< 1 if we are testing the sprayer and should output a minimum value
         uint8_t running     : 1;            ///< 1 if we are permitted to run sprayer
+        uint8_t automode : 1;            ///1 if pump is auto control by ground speed
     } _flags;
 
     // internal variables
     uint32_t        _speed_over_min_time;   ///< time at which we reached speed minimum
     uint32_t        _speed_under_min_time;  ///< time at which we fell below speed minimum
 
+    //
+    float _pump_grdspd_rate;
+    int8_t _pump_manua_pct;
+
+    int8_t _ch_pump_spd=0;
+
+    void init();
     void stop_spraying();
 };

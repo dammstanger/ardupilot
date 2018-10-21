@@ -50,6 +50,14 @@ const AP_Param::GroupInfo AC_Sprayer::var_info[] = {
 
 AC_Sprayer::AC_Sprayer()
 {
+    if (_s_instance) {
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+        AP_HAL::panic("Too many sprayers");
+#endif
+        return;
+    }
+    _s_instance = this;
+
     AP_Param::setup_object_defaults(this, var_info);
 
     // check for silly parameter values
@@ -60,19 +68,48 @@ AC_Sprayer::AC_Sprayer()
         _spinner_pwm.set_and_save(AC_SPRAYER_DEFAULT_SPINNER_PWM);
     }
 
+    _flags.automode = false;
     // To-Do: ensure that the pump and spinner servo channels are enabled
 }
 
+/*
+ * Get the AP_Sprayer singleton
+ */
+AC_Sprayer *AC_Sprayer::_s_instance = nullptr;
+AC_Sprayer *AC_Sprayer::get_instance()
+{
+    return _s_instance;
+}
+
+void AC_Sprayer::init()
+{
+    _pump_grdspd_rate = (100.0f -AC_SPRAYER_DEFAULT_PUMP_MIN)/(500.0f - 100.0f);
+
+    SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_pump, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+    SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_spinner, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+}
+
+
 void AC_Sprayer::run(const bool true_false)
 {
-    // return immediately if no change
-    if (true_false == _flags.running) {
-        return;
+    //init output value if not init
+    if(!_flags.inited){
+        init();
+        _flags.inited = true;
+        _flags.running = false;
+        _pump_manua_pct = 50;
+    }else if(true_false){
+        // return immediately if no change
+        if (_flags.running) {
+            _flags.running = false;
+        }else{
+        // set flag indicate whether spraying is permitted:
+        // do not allow running to be set to true if we are currently not enabled
+            _flags.running = _enabled;
+        }
+    }else{
+        return ;
     }
-
-    // set flag indicate whether spraying is permitted:
-    // do not allow running to be set to true if we are currently not enabled
-    _flags.running = true_false && _enabled;
 
     // turn off the pump and spinner servos if necessary
     if (!_flags.running) {
@@ -80,6 +117,11 @@ void AC_Sprayer::run(const bool true_false)
     }
 }
 
+
+void AC_Sprayer::change_pump_speed(const int8_t val)
+{
+    _ch_pump_spd = val;
+}
 void AC_Sprayer::stop_spraying()
 {
     SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_pump, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
@@ -102,69 +144,101 @@ void AC_Sprayer::update()
         return;
     }
 
-    // get horizontal velocity
-    Vector3f velocity;
-    if (!AP::ahrs().get_velocity_NED(velocity)) {
-        // treat unknown velocity as zero which should lead to pump stopping
-        // velocity will already be zero but this avoids a coverity warning
-        velocity.zero();
-    }
-    float ground_speed = norm(velocity.x * 100.0f, velocity.y * 100.0f);
-
-    // get the current time
-    const uint32_t now = AP_HAL::millis();
-
     bool should_be_spraying = _flags.spraying;
-    // check our speed vs the minimum
-    if (ground_speed >= _speed_min) {
-        // if we are not already spraying
-        if (!_flags.spraying) {
-            // set the timer if this is the first time we've surpassed the min speed
-            if (_speed_over_min_time == 0) {
-                _speed_over_min_time = now;
-            }else{
-                // check if we've been over the speed long enough to engage the sprayer
-                if((now - _speed_over_min_time) > AC_SPRAYER_DEFAULT_TURN_ON_DELAY) {
-                    should_be_spraying = true;
-                    _speed_over_min_time = 0;
-                }
-            }
+    float ground_speed = 0;
+    if(_flags.automode){
+        // get horizontal velocity
+        Vector3f velocity;
+        if (!AP::ahrs().get_velocity_NED(velocity)) {
+            // treat unknown velocity as zero which should lead to pump stopping
+            // velocity will already be zero but this avoids a coverity warning
+            velocity.zero();
         }
-        // reset the speed under timer
-        _speed_under_min_time = 0;
-    } else {
-        // we are under the min speed.
-        if (_flags.spraying) {
-            // set the timer if this is the first time we've dropped below the min speed
-            if (_speed_under_min_time == 0) {
-                _speed_under_min_time = now;
-            }else{
-                // check if we've been over the speed long enough to engage the sprayer
-                if((now - _speed_under_min_time) > AC_SPRAYER_DEFAULT_SHUT_OFF_DELAY) {
-                    should_be_spraying = false;
-                    _speed_under_min_time = 0;
-                }
-            }
-        }
-        // reset the speed over timer
-        _speed_over_min_time = 0;
-    }
+        ground_speed = norm(velocity.x * 100.0f, velocity.y * 100.0f);
 
-    // if testing pump output speed as if traveling at 1m/s
-    if (_flags.testing) {
-        ground_speed = 100.0f;
+        // get the current time
+        const uint32_t now = AP_HAL::millis();
+
+        // check our speed vs the minimum
+        if (ground_speed >= _speed_min) {
+            // if we are not already spraying
+            if (!_flags.spraying) {
+                // set the timer if this is the first time we've surpassed the min speed
+                if (_speed_over_min_time == 0) {
+                    _speed_over_min_time = now;
+                }else{
+                    // check if we've been over the speed long enough to engage the sprayer
+                    if((now - _speed_over_min_time) > AC_SPRAYER_DEFAULT_TURN_ON_DELAY) {
+                        should_be_spraying = true;
+                        _speed_over_min_time = 0;
+                    }
+                }
+            }
+            // reset the speed under timer
+            _speed_under_min_time = 0;
+        } else {
+            // we are under the min speed.
+            if (_flags.spraying) {
+                // set the timer if this is the first time we've dropped below the min speed
+                if (_speed_under_min_time == 0) {
+                    _speed_under_min_time = now;
+                }else{
+                    // check if we've been over the speed long enough to engage the sprayer
+                    if((now - _speed_under_min_time) > AC_SPRAYER_DEFAULT_SHUT_OFF_DELAY) {
+                        should_be_spraying = false;
+                        _speed_under_min_time = 0;
+                    }
+                }
+            }
+            // reset the speed over timer
+            _speed_over_min_time = 0;
+        }
+    }else{
+    //Manual pump speed control
         should_be_spraying = true;
     }
 
+    // if testing pump output speed as if traveling at 1m/s
+//    if (_flags.testing) {
+//        ground_speed = 100.0f;
+//        should_be_spraying = true;
+//    }
+
     // if spraying or testing update the pump servo position
     if (should_be_spraying) {
-        float pos = ground_speed * _pump_pct_1ms;
-        pos = MAX(pos, 100 *_pump_min_pct); // ensure min pump speed
-        pos = MIN(pos,10000); // clamp to range
-        SRV_Channels::move_servo(SRV_Channel::k_sprayer_pump, pos, 0, 10000);
-        SRV_Channels::set_output_pwm(SRV_Channel::k_sprayer_spinner, _spinner_pwm);
+        int8_t percent = _pump_min_pct;
+        if(_flags.automode){
+            percent = _pump_min_pct + ground_speed * _pump_grdspd_rate;
+        }else{
+
+            if(_ch_pump_spd==1){
+                _pump_manua_pct += 9;
+            }else if(_ch_pump_spd==-1){
+                _pump_manua_pct -= 9;
+            }
+            _pump_manua_pct = MAX(_pump_manua_pct, 0);
+            _pump_manua_pct = MIN(_pump_manua_pct,100);
+            percent = _pump_min_pct + _pump_manua_pct;
+        }
+        percent = MAX(percent, _pump_min_pct); // ensure min pump speed
+        percent = MIN(percent,100);     // clamp to range
+
+        int16_t pump_pwm = AC_SPRAYER_DEFAULT_PUMP_STOP_PWM + percent * _pump_pct_1ms;
+        constrain_int16(pump_pwm,AC_SPRAYER_DEFAULT_PUMP_STOP_PWM, AC_SPRAYER_DEFAULT_PUMP_MAX_PWM);
+
+        SRV_Channels::set_output_pwm(SRV_Channel::k_sprayer_pump, pump_pwm);
+//        SRV_Channels::set_output_pwm(SRV_Channel::k_sprayer_spinner, _spinner_pwm);
         _flags.spraying = true;
     } else {
         stop_spraying();
     }
 }
+
+namespace AP {
+
+AC_Sprayer *sprayer()
+{
+    return AC_Sprayer::get_instance();
+}
+
+};
