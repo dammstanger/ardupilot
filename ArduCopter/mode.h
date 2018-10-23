@@ -315,8 +315,9 @@ protected:
 private:
     void manual_start();
     void calc_ab_bearing();
+    bool set_ab_alt(float new_alt_cm);
     void generate_next_abline();
-    void generate_abline(uint16_t shift_cnt);
+    bool generate_abline(uint16_t shift_cnt);
     void reset_mission();
     void do_exit_auto();
     void wp_run();
@@ -355,11 +356,12 @@ private:
     }_flags;
 
     AbzzMode _mode = Abzz_Manual;   // controls which auto controller is run
-    Location_Class _point_a;
+    Location_Class _point_a;                    //position with abs lat and lng , but alt is above EKF_origin in cm
     Location_Class _point_b;
-    Location_Class _point_shift_a;
-    Location_Class _point_shift_b;
     Location_Class _point_break;
+    Vector3f _point_shift_a;                    //position vector related to EKF_origin in cm NEU
+    Vector3f _point_shift_b;
+
     uint16_t _shift_count = 0;
     ABsample_sta_eu _sta_absetting = SAMPLE_A;
     ABzz_sta_eu _sta_abzz = Start;

@@ -120,6 +120,10 @@ public:
     ///     returns false on failure (likely caused by missing terrain data)
     bool set_wp_origin_and_destination(const Vector3f& origin, const Vector3f& destination, bool terrain_alt = false);
 
+    //set_wp_origin_and_destination altitude the value must be related from ekf origin in cm, and the set_wp_origin_and_destination()
+    //must be call first
+    bool set_wp_origin_and_destination_alt(const float target_alt_cm);
+
     /// shift_wp_origin_to_current_pos - shifts the origin and destination so the origin starts at the current position
     ///     used to reset the position just before takeoff
     ///     relies on set_wp_destination or set_wp_origin_and_destination having been called first
@@ -210,6 +214,10 @@ public:
 
     /// advance_wp_target_along_track - move target location along track from origin to destination
     bool advance_wp_target_along_track(float dt);
+
+    /// advance_wp_xy_target_along_track - move target location along track from origin to destination
+    /// but only update position xy target
+    bool advance_wp_xy_target_along_track(float dt);
 
     /// return the crosstrack_error - horizontal error of the actual position vs the desired position
     float crosstrack_error() const { return _track_error_xy;}

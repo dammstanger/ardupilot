@@ -110,20 +110,27 @@ void Copter::ModeABZz::update_abwp_sta()
             if(!_flags.ab_bearing_set){
                 calc_ab_bearing();
             }
-            //update loiter timer
-            if(get_distance_cm(copter.current_loc, _point_shift_a)< ABZZ_WP_RADIUS_CM){
+
+             auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
+
+            //set start point and line cnt
+            _shift_count = 1;
+            generate_abline(_shift_count);
+
+            //update loiter timer with destination distance
+            Vector3f curr_vect;
+            if(!copter.current_loc.get_vector_from_origin_NEU(curr_vect)){
+                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: current position error.");
+                return;
+            }
+            Vector3f vect = _point_shift_a - curr_vect;
+            if(vect.length()< ABZZ_WP_RADIUS_CM){
                 loiter_time_max = 2;
             }
             else{
                 loiter_time_max = 1;
             }
             loiter_time = 0;
-
-             auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
-
-            //set start point and line cnt
-            _shift_count = 0;
-            generate_abline(_shift_count);
 
             // initialise waypoint controller
             wp_nav->wp_and_spline_init();
@@ -165,7 +172,19 @@ void Copter::ModeABZz::update_abwp_sta()
         //execute app start or resume command is update
         if(_cmd_auto){
 
-             if(get_distance_cm(copter.current_loc, _point_break)< ABZZ_WP_RADIUS_CM){
+             //update loiter timer with destination distance
+             Vector3f curr_vect;
+             if(!copter.current_loc.get_vector_from_origin_NEU(curr_vect)){
+                 gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: current position error.");
+                 return;
+             }
+             Vector3f vect;
+             if(!_point_break.get_vector_from_origin_NEU(vect)){
+                 gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: break point error.");
+                 return;
+             }
+             vect -= curr_vect;
+             if(vect.length() < ABZZ_WP_RADIUS_CM){
                  loiter_time_max = 2;
              }
              else{
@@ -190,10 +209,14 @@ void Copter::ModeABZz::update_abwp_sta()
     case GotoWork:
          if(verify_nav_wp()){
 
-            // convert circle_edge_neu to Location_Class
-            Location_Class dest(copter.wp_nav->get_wp_destination());
-
-            if(get_distance_cm(copter.current_loc, dest)< ABZZ_WP_RADIUS_CM){
+             //update loiter timer with destination distance
+             Vector3f curr_vect;
+             if(!copter.current_loc.get_vector_from_origin_NEU(curr_vect)){
+                 gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: current position error.");
+                 return;
+             }
+             Vector3f delta_vect = _point_shift_b -curr_vect;
+            if(delta_vect.length() < ABZZ_WP_RADIUS_CM){
                 loiter_time_max = 2;
             }
             else{
@@ -203,7 +226,7 @@ void Copter::ModeABZz::update_abwp_sta()
          //set fixed sepcific yaw angle according to way point direction
             auto_yaw.set_fixed_yaw(_ab_bearing_deg, 20.0f, 0, false);
             copter.wp_nav->set_speed_xy(_speed_last);
-            copter.wp_nav->set_wp_destination(_point_shift_b);
+            copter.wp_nav->set_wp_destination(_point_shift_b, false);
             //set flight mode
             _mode = Abzz_WP;
 
@@ -222,7 +245,7 @@ void Copter::ModeABZz::update_abwp_sta()
 
             loiter_time_max = 1;
             loiter_time = 0;
-            copter.wp_nav->set_wp_destination(_point_shift_a);
+            copter.wp_nav->set_wp_destination(_point_shift_a, false);
             _sta_abzz = BToA;
         }
         break;
@@ -239,7 +262,7 @@ void Copter::ModeABZz::update_abwp_sta()
             gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: BtoA finish");
             loiter_time_max = 1;
             loiter_time = 0;
-            copter.wp_nav->set_wp_destination(_point_shift_b);
+            copter.wp_nav->set_wp_destination(_point_shift_b, false);
             _sta_abzz = AToB;
         }
         break;
@@ -256,6 +279,7 @@ void Copter::ModeABZz::update_abwp_sta()
             do_exit_auto();
          }
 
+        //change speed
         int16_t ch_spd = channel_speed->get_control_in();
         int16_t section;
         if(ch_spd<250){
@@ -276,6 +300,9 @@ void Copter::ModeABZz::update_abwp_sta()
             _speed_last = section;
         }
 
+        //change alt
+        Vector3f refalt_point = copter.wp_nav->get_wp_destination();
+        set_ab_alt(refalt_point.z);
     }
 
 
@@ -388,6 +415,17 @@ void Copter::ModeABZz::change_shiftwidth(uint16_t new_width_cm)
 }
 
 
+bool Copter::ModeABZz::set_ab_alt(float new_alt_cm)
+{
+    if(_sta_absetting==AB_POINT_CMPLT){
+        _point_a.alt = new_alt_cm;
+        _point_b.alt = new_alt_cm;
+        return true;
+    }
+    return false;
+}
+
+
 void Copter::ModeABZz::generate_next_abline()
 {
     _shift_count++;
@@ -395,7 +433,7 @@ void Copter::ModeABZz::generate_next_abline()
 }
 
 
-void Copter::ModeABZz::generate_abline(uint16_t shift_cnt)
+bool Copter::ModeABZz::generate_abline(uint16_t shift_cnt)
 {
     //
     float shift_bearing_deg;
@@ -405,20 +443,49 @@ void Copter::ModeABZz::generate_abline(uint16_t shift_cnt)
         shift_bearing_deg = wrap_360(_ab_bearing_deg-90.0f);
     }
 
-    if(shift_cnt%2==0){
-        _point_shift_a = _point_a;
-        _point_shift_b = _point_b;
-        if(shift_cnt==0)
-            return ;
-    }else{
-        _point_shift_a = _point_b;
-        _point_shift_b = _point_a;
+    Vector3f vet_a;
+    Vector3f vet_b;
+    if(!_point_a.get_vector_from_origin_NEU(vet_a)){
+        gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: point a position error.");
+        return false;
+    }
+    if(!_point_b.get_vector_from_origin_NEU(vet_b)){
+        gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: point b position error.");
+        return false;
     }
 
-    location_update(_point_shift_a, shift_bearing_deg, _shift_width_cm*shift_cnt/100.0f);
-    location_update(_point_shift_b, shift_bearing_deg, _shift_width_cm*shift_cnt/100.0f);
+    if(shift_cnt%2==0){
+        _point_shift_a = vet_a;
+        _point_shift_b = vet_b;
 
+    }else{
+        _point_shift_a = vet_b;
+        _point_shift_b = vet_a;
+    }
+
+    if(shift_cnt==0)
+        return true;
+
+    //update shift point by shift vector
+    float ofs_x = cosf(radians(shift_bearing_deg))*_shift_width_cm*shift_cnt;
+    float ofs_y  = sinf(radians(shift_bearing_deg))*_shift_width_cm*shift_cnt;
+
+    gcs().send_text(MAV_SEVERITY_INFO, "ofs_x=%f,ofs_y=%f", ofs_x, ofs_y);
+    _point_shift_a += Vector3f(ofs_x,ofs_y,0);
+    _point_shift_b += Vector3f(ofs_x,ofs_y,0);
+
+//    location_update(_point_shift_a, );
+//    location_update(_point_shift_b, );
+
+    return true;
 }
+
+
+// initialise position and desired velocity
+//if (!pos_control->is_active_z()) {
+//    pos_control->set_alt_target(inertial_nav.get_altitude());
+//    pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
+//}
 
 
 //reset necessary mission data
@@ -445,6 +512,24 @@ void Copter::ModeABZz::manual_start()
 }
 
 // auto_wp_start - initialises waypoint controller to implement flying to a particular destination
+bool Copter::ModeABZz::wp_start(const Vector3f& dest_vect)
+{
+
+    copter.wp_nav->set_speed_xy(500);
+
+    // send target to waypoint controller
+    if (!wp_nav->set_wp_destination(dest_vect,false)) {
+        // failure to set destination can only be because of missing terrain data
+        copter.failsafe_terrain_on_event();
+        return false;
+    }
+
+    _mode = Abzz_WP;
+    return true;
+
+}
+
+// auto_wp_start - initialises waypoint controller to implement flying to a particular destination
 bool Copter::ModeABZz::wp_start(const Location_Class& dest_loc)
 {
 
@@ -459,7 +544,6 @@ bool Copter::ModeABZz::wp_start(const Location_Class& dest_loc)
 
     _mode = Abzz_WP;
     return true;
-
 
 }
 
@@ -504,6 +588,8 @@ bool Copter::ModeABZz::get_wp(Location_Class& destination)
         return false;
     }
 }
+
+uint16_t _testcnt=0;
 
 // manual_control - process manual control
 void Copter::ModeABZz::manual_control_run()
@@ -552,6 +638,10 @@ void Copter::ModeABZz::manual_control_run()
 
     // update altitude target and call position controller
     pos_control->set_alt_target_from_climb_rate_ff(target_climb_rate, G_Dt, false);
+    if(_testcnt++>200){
+        _testcnt = 0;
+        gcs().send_text(MAV_SEVERITY_INFO, " _pos_target.z=%f",testdat);
+    }
 
     // adjusts target up or down using a climb rate
     pos_control->update_z_controller();
@@ -562,6 +652,7 @@ void Copter::ModeABZz::manual_control_run()
 //      called by auto_run at 100hz or more
 void Copter::ModeABZz::wp_run()
 {
+    float target_climb_rate = 0.0f;
 
     // if not auto armed or motor interlock not enabled set throttle to zero and exit immediately
     if (!motors->armed() || !ap.auto_armed || !motors->get_interlock()) {
@@ -581,6 +672,11 @@ void Copter::ModeABZz::wp_run()
         if (!is_zero(target_yaw_rate)) {
             auto_yaw.set_mode(AUTO_YAW_HOLD);
         }
+
+        // get pilot desired climb rate
+        target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
+        target_climb_rate = constrain_float(target_climb_rate, -get_pilot_speed_dn(), g.pilot_speed_up);
+
     }
 
     // set motors to full range
@@ -588,6 +684,22 @@ void Copter::ModeABZz::wp_run()
 
     // run waypoint controller
     copter.failsafe_terrain_set_status(wp_nav->update_wpnav());
+
+    // adjust climb rate using rangefinder
+    target_climb_rate = get_surface_tracking_climb_rate(target_climb_rate, pos_control->get_alt_target(), G_Dt);
+
+    // get avoidance adjusted climb rate
+    target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);
+
+    // update altitude target and call position controller
+    if(target_climb_rate>0.01f ||target_climb_rate<-0.01f){
+        pos_control->set_alt_target_from_climb_rate_ff(target_climb_rate, G_Dt, false);
+        wp_nav->set_wp_origin_and_destination_alt(pos_control->get_alt_target());
+        if(_testcnt++>200){
+            _testcnt = 0;
+            gcs().send_text(MAV_SEVERITY_INFO, " _pos_target.z=%f",testdat);
+        }
+    }
 
     // call z-axis position controller (wpnav should have already updated it's alt target)
     pos_control->update_z_controller();
