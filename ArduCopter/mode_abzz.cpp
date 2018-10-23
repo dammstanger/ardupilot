@@ -7,6 +7,8 @@
  */
 
 #define ABZZ_WP_RADIUS_CM   300
+#define ABZZ_YAW_LOOK_DISTANCE_MIN_CM   800
+
 
 
 // abzz_init - initialise abzz controller flight mode
@@ -111,8 +113,6 @@ void Copter::ModeABZz::update_abwp_sta()
                 calc_ab_bearing();
             }
 
-             auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
-
             //set start point and line cnt
             _shift_count = 1;
             generate_abline(_shift_count);
@@ -124,13 +124,22 @@ void Copter::ModeABZz::update_abwp_sta()
                 return;
             }
             Vector3f vect = _point_shift_a - curr_vect;
-            if(vect.length()< ABZZ_WP_RADIUS_CM){
+            float tag_distance = vect.length();
+            if(tag_distance< ABZZ_WP_RADIUS_CM){
                 loiter_time_max = 2;
             }
             else{
                 loiter_time_max = 1;
             }
             loiter_time = 0;
+
+            //if far enuogh we need vehicle's head look to the taget point
+            //to make sure forward direction is under radar detect range
+            if(tag_distance>ABZZ_YAW_LOOK_DISTANCE_MIN_CM){
+                auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
+            }else{
+                auto_yaw.set_fixed_yaw(_ab_bearing_deg, 20.0f, 0, false);
+            }
 
             // initialise waypoint controller
             wp_nav->wp_and_spline_init();
