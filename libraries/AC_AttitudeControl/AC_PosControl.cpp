@@ -319,7 +319,6 @@ void AC_PosControl::set_alt_target_from_climb_rate(float climb_rate_cms, float d
     _flags.use_desvel_ff_z = false;
     _vel_desired.z = climb_rate_cms;
 }
-float testdat;
 
 /// set_alt_target_from_climb_rate_ff - adjusts target up or down using a climb rate in cm/s using feed-forward
 ///     should be called continuously (with dt set to be the expected time between calls)
@@ -354,7 +353,6 @@ void AC_PosControl::set_alt_target_from_climb_rate_ff(float climb_rate_cms, floa
     // To-Do: add check of _limit.pos_down?
     if ((_vel_desired.z<0 && (!_motors.limit.throttle_lower || force_descend)) || (_vel_desired.z>0 && !_motors.limit.throttle_upper && !_limit.pos_up)) {
         _pos_target.z += _vel_desired.z * dt;
-        testdat= _pos_target.z;
     }
 }
 

@@ -150,7 +150,7 @@ enum AgrCmd {
 
 // abzz modes
 enum AbzzMode {
-    Abzz_Manual,
+    Abzz_Loiter,
     Abzz_WP,
     Abzz_RTL,
     Abzz_Spline,

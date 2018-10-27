@@ -284,8 +284,9 @@ public:
     void save_ab_point(uint8_t get_b);
     void change_shiftwidth(uint16_t new_width_cm);
     void save_ab_shiftdir();
-    void set_cmd_auto(int8_t flag_auto);
-    void set_cmd_endmission(int8_t flag_end);
+    void exit_mode(bool end_mission);
+    void start_mission();
+    void reset_mission();
 
 
     bool wp_start(const Vector3f& destination);
@@ -313,13 +314,14 @@ protected:
     void run_autopilot() override;
 
 private:
-    void manual_start();
+    bool check_ab_point_validity();
+    bool check_break_point_validity();
     void calc_ab_bearing();
     bool set_ab_alt(float new_alt_cm);
     void generate_next_abline();
     bool generate_abline(uint16_t shift_cnt);
-    void reset_mission();
-    void do_exit_auto();
+    void record_breakpoint();
+    void loiter_run();
     void wp_run();
     void spline_run();
     void manual_control_run();
@@ -339,23 +341,19 @@ private:
 
     typedef enum{
         Start = 0,
-        Suspend,
+        Resume,
         GotoWork,
         AToB,
         BToA,
         Brake
     }ABzz_sta_eu;
 
-    bool _cmd_auto = false;                    //true if receive a auto command from app
-    bool _cmd_endmission = false;       //true if receive a end command from app
-
-
     struct{
-        uint8_t ab_bearing_set:1;        //true if the bearing of ab point is set
+        uint8_t ab_bearing_set:1;               //true if the bearing of ab point is set
         uint8_t ab_brearing_reverse:1;      //true if A and B point is reverse from the origin sampled
     }_flags;
 
-    AbzzMode _mode = Abzz_Manual;   // controls which auto controller is run
+    AbzzMode _mode = Abzz_WP;           // controls which auto controller is run
     Location_Class _point_a;                    //position with abs lat and lng , but alt is above EKF_origin in cm
     Location_Class _point_b;
     Location_Class _point_break;
@@ -367,7 +365,7 @@ private:
     ABzz_sta_eu _sta_abzz = Start;
     float _ab_bearing_deg;
     uint16_t _shift_width_cm;
-    uint8_t _shift_direction_cw = 1;
+    int8_t _shift_direction_cw = 1;
     uint16_t _speed_last;
 
     // Loiter control

@@ -285,7 +285,6 @@ bool AC_WPNav::set_wp_origin_and_destination(const Vector3f& origin, const Vecto
 
     return true;
 }
-//float testdat;
 
 //need to be call before advance update_wpnav
 bool AC_WPNav::set_wp_origin_and_destination_alt(const float target_alt_cm)
@@ -662,6 +661,7 @@ int32_t AC_WPNav::get_wp_bearing_to_destination() const
 {
     return get_bearing_cd(_inav.get_position(), _destination);
 }
+float testdat;
 
 /// update_wpnav - run the wp controller - should be called at 100hz or higher
 bool AC_WPNav::update_wpnav()
@@ -679,6 +679,7 @@ bool AC_WPNav::update_wpnav()
     _pos_control.set_accel_xy(_wp_accel_cmss);
     _pos_control.set_accel_z(_wp_accel_z_cmss);
 
+    testdat= _origin.z;
     // advance the target if necessary
     if (!advance_wp_xy_target_along_track(dt)) {
 //    if (!advance_wp_target_along_track(dt)) {

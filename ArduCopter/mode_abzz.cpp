@@ -14,41 +14,75 @@
 // abzz_init - initialise abzz controller flight mode
 bool Copter::ModeABZz::init(bool ignore_checks)
 {
-    //TODO: we need to reject into this mode when the tank is empty
-    if ((copter.position_ok())) {
+    // TODO: we need to reject into this mode when the AB point and necessary work set is not complete
+    if(!copter.position_ok()){
+         gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: position is not OK.");
+         return false;
+    }
 
-        // initialize's loiter position and velocity on xy-axes from current pos and velocity
-        loiter_nav->clear_pilot_desired_acceleration();
-        loiter_nav->init_target();
-
-        // initialise position_z and desired velocity_z
-        if (!pos_control->is_active_z()) {
-            pos_control->set_alt_target_to_current_alt();
-            pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
-        }
-
-//        //TODO: we also need to check if there has a valid break point
-//        if (_sta_absetting=AB_POINT_CMPLT) {
-//             _sta_abzz = Resume;
-//        }else{
-//             gcs().send_text(MAV_SEVERITY_CRITICAL, "abzz: AB point sample not complete.");
-
-            reset_mission();
-            _mode = Abzz_Manual;
-            _sta_abzz = Start;
-//        }
-
-         return true;
-    } else {
-        gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: ekf position not lock.");
+    // reject switching to auto mode if landed with motors armed but first command is not a takeoff (reduce chance of flips)
+    if (!motors->armed() || ap.land_complete) {
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "ABZZ: need Takeoff.");
         return false;
     }
+
+    if(_sta_absetting!=AB_POINT_CMPLT){
+        switch(_sta_absetting){
+            case SAMPLE_A:
+                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need A and B point.");
+                break;
+            case SAMPLE_B:
+                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need B point.");
+                break;
+            case SEL_SHIFT_DIR:
+                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need shift direction.");
+                break;
+            default:
+                break;
+            }
+        return false;
+    }
+
+    // TODO: we also need to check if there has a valid break point
+    if(!check_ab_point_validity()) return false;
+
+    //if break point is valid means we should continue the task
+    if(check_break_point_validity()){
+        _sta_abzz = Resume;
+    }else{
+        start_mission();
+        _sta_abzz = Start;
+    }
+
+    //calculate yaw
+    if(!_flags.ab_bearing_set){
+        calc_ab_bearing();
+    }
+
+    // initialize's loiter position and velocity on xy-axes from current pos and velocity
+    loiter_nav->clear_pilot_desired_acceleration();
+    loiter_nav->init_target();
+
+    // initialise position_z and desired velocity_z
+    if (!pos_control->is_active_z()) {
+        pos_control->set_alt_target_to_current_alt();
+        pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
+    }
+
+    // initialise waypoint and spline controller
+    wp_nav->wp_and_spline_init();
+
+    //controller mode should be set to loiter to prevent run in unexperted status
+    //before the low **run_autopilot** loop  initialise the WP_Nav
+    _mode = Abzz_Loiter;
+
+    return true;
 }
 
 
 // auto_run - runs the auto controller
 //      should be called at 100hz or more
-//      relies on run_autopilot being called at 10hz which handles decision making and non-navigation related commands
+//      relies on run_autopilot being called at 50hz which handles decision making and non-navigation related commands
 void Copter::ModeABZz::run()
 {
     // initialize vertical speed and acceleration's range
@@ -64,8 +98,8 @@ void Copter::ModeABZz::run()
     // call the correct auto controller
     switch (_mode) {
 
-    case Abzz_Manual:
-        manual_control_run();
+    case Abzz_Loiter:
+        loiter_run();
         break;
 
     case Abzz_WP:
@@ -81,7 +115,7 @@ void Copter::ModeABZz::run()
     }
 }
 
-// update auto procession status  SCHED _TASK 50Hz  100us
+// update auto processing status  SCHED _TASK 50Hz  100us
 void Copter::ModeABZz::run_autopilot()
 {
     //update_abwp_sta
@@ -93,25 +127,11 @@ void Copter::ModeABZz::run_autopilot()
 void Copter::ModeABZz::update_abwp_sta()
 {
     bool wp_complete = false;
-    //TODO: we need to prevent the AB point location where is far away from home
     switch(_sta_abzz){
 
-    case Start:
-        if(_sta_absetting==AB_POINT_CMPLT && !_point_break.is_zero()){
-
-            if(!_flags.ab_bearing_set){
-                calc_ab_bearing();
-            }
-            _sta_abzz = Suspend;
-            return;
-        }else if(_sta_absetting==AB_POINT_CMPLT && _cmd_auto){
-
+    case Start:{
             //now we can start auto flight
             gcs().send_text(MAV_SEVERITY_INFO, "ab start");
-
-            if(!_flags.ab_bearing_set){
-                calc_ab_bearing();
-            }
 
             //set start point and line cnt
             _shift_count = 1;
@@ -141,46 +161,19 @@ void Copter::ModeABZz::update_abwp_sta()
                 auto_yaw.set_fixed_yaw(_ab_bearing_deg, 20.0f, 0, false);
             }
 
-            // initialise waypoint controller
-            wp_nav->wp_and_spline_init();
+            // initialise waypoint and spline controller
+//            wp_nav->wp_and_spline_init();
 
             if (wp_start(_point_shift_a)){
                 _sta_abzz = GotoWork;
+                _mode = Abzz_WP;
             }else{
                 gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: fail to start, check AB point.");
-                set_cmd_auto(false);
             }
-            return;
-        }
-
-
-        //if in AB sample status
-        save_ab_shiftdir();
-        //keep in Manual flight mode
-        if(_mode!=Abzz_Manual){
-            manual_start();
         }
         break;
 
-    case Suspend:
-        //keep in Manual flight mode
-        if(_mode!=Abzz_Manual){
-            manual_start();
-        }
-
-        //app require finish
-        if(_cmd_endmission){
-            _cmd_endmission = false;
-
-            //reset abzz mode and point sampling status
-            _sta_absetting = SAMPLE_A;
-            _sta_abzz = Start;
-            return;
-       }
-
-        //execute app start or resume command is update
-        if(_cmd_auto){
-
+    case Resume:{
              //update loiter timer with destination distance
              Vector3f curr_vect;
              if(!copter.current_loc.get_vector_from_origin_NEU(curr_vect)){
@@ -203,21 +196,22 @@ void Copter::ModeABZz::update_abwp_sta()
 
              auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
 
-             wp_nav->wp_and_spline_init();
+            // initialise waypoint and spline controller
+//            wp_nav->wp_and_spline_init();
+
             //set start point to last break point
             if (wp_start(_point_break)){
                 _sta_abzz = GotoWork;
+                _mode = Abzz_WP;
             }else{
-                gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: fail to start, check break point.");
-                set_cmd_auto(false);
+                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: fail to start, check break point.");
             }
-            return;
+            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: Resume.");
         }
         break;
 
     case GotoWork:
          if(verify_nav_wp()){
-
              //update loiter timer with destination distance
              Vector3f curr_vect;
              if(!copter.current_loc.get_vector_from_origin_NEU(curr_vect)){
@@ -232,14 +226,13 @@ void Copter::ModeABZz::update_abwp_sta()
                 loiter_time_max = 1;
             }
             loiter_time = 0;
-         //set fixed sepcific yaw angle according to way point direction
+            //set fixed sepcific yaw angle according to way point direction
             auto_yaw.set_fixed_yaw(_ab_bearing_deg, 20.0f, 0, false);
             copter.wp_nav->set_speed_xy(_speed_last);
             copter.wp_nav->set_wp_destination(_point_shift_b, false);
-            //set flight mode
-            _mode = Abzz_WP;
 
             _sta_abzz = AToB;
+            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: GotoWork.");
          }
          break;
 
@@ -280,44 +273,39 @@ void Copter::ModeABZz::update_abwp_sta()
         break;
     }
 
+    // any roll or pitch stick action will cause suspend
+    if(channel_pitch->get_control_in() > 100 ||channel_pitch->get_control_in() < -100
+        ||channel_roll->get_control_in() > 100 ||channel_roll->get_control_in() < -100){
+        exit_mode(false);
+     }
 
-    //if in auto flight mode any roll or pitch stick action will cause suspend
-    if(_sta_abzz >Suspend){
-        if(!_cmd_auto || channel_pitch->get_control_in() > 50 ||channel_pitch->get_control_in() < -50
-            ||channel_roll->get_control_in() > 50 ||channel_roll->get_control_in() < -50){
-            do_exit_auto();
-         }
-
-        //change speed
-        int16_t ch_spd = channel_speed->get_control_in();
-        int16_t section;
-        if(ch_spd<250){
-            section = 100;
-            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=100");
-        }else if(ch_spd>=250 && ch_spd <500){
-            section = 300;
-            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=300");
-        }else if(ch_spd>=500 && ch_spd <750){
-            section = 500;
-//            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=500");
-        }else if(ch_spd>=750){
-            section = 700;
-            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=700");
-        }
-        if(section!=_speed_last){
-            copter.wp_nav->set_speed_xy(section);
-            _speed_last = section;
-        }
-
-        //change alt
-        Vector3f refalt_point = copter.wp_nav->get_wp_destination();
-        set_ab_alt(refalt_point.z);
+    //change speed
+    int16_t ch_spd = channel_speed->get_control_in();
+    int16_t section;
+    if(ch_spd<250){
+        section = 100;
+        gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=100");
+    }else if(ch_spd>=250 && ch_spd <500){
+        section = 300;
+        gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=300");
+    }else if(ch_spd>=500 && ch_spd <750){
+        section = 500;
+        gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=500");
+    }else if(ch_spd>=750){
+        section = 700;
+        gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=700");
+    }
+    if(section!=_speed_last){
+        copter.wp_nav->set_speed_xy(section);
+        _speed_last = section;
     }
 
-
+    //change alt in auto flight
+    Vector3f refalt_point = copter.wp_nav->get_wp_destination();
+    set_ab_alt(refalt_point.z);
 }
 
-void Copter::ModeABZz::do_exit_auto()
+void Copter::ModeABZz::record_breakpoint()
 {
     //record break point if necessary
     if(_sta_abzz == AToB){
@@ -325,34 +313,34 @@ void Copter::ModeABZz::do_exit_auto()
     }else if(_sta_abzz == BToA){
         _point_break = _point_shift_a;
     }
-
-    _sta_abzz = Suspend;
-    gcs().send_text(MAV_SEVERITY_INFO, "ABZz: Suspend");
+    gcs().send_text(MAV_SEVERITY_INFO, "ABZz: break_point recorded");
 }
 
-
-void Copter::ModeABZz::set_cmd_auto(int8_t flag_auto)
+void Copter::ModeABZz::exit_mode(bool end_mission)
 {
-    if(flag_auto){
-        if(_sta_abzz<=Suspend && _sta_absetting==AB_POINT_CMPLT){
-            _cmd_auto = true;
-             gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: auto start.");
-            return ;
-        }
-        else if(_sta_absetting!=AB_POINT_CMPLT){
-            _cmd_auto = false;
-            gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: AB setting not complete.");
-        }
+    if(end_mission){
+        reset_mission();
     }else{
-        _cmd_auto = false;
+        record_breakpoint();
+    }
+    if (copter.set_mode(LOITER, MODE_REASON_UNKNOWN)) {
+        copter.mode_brake.timeout_to_loiter_ms(2000);
     }
 }
 
-void Copter::ModeABZz::set_cmd_endmission(int8_t flag_end)
+
+bool Copter::ModeABZz::check_ab_point_validity()
 {
-    if(flag_end){
-        reset_mission();
-        _sta_abzz = Start;
+    return true;
+}
+
+bool Copter::ModeABZz::check_break_point_validity()
+{
+    if(!_point_break.is_zero()){
+        return true;
+    }
+    else{
+        return false;
     }
 }
 
@@ -383,7 +371,7 @@ void Copter::ModeABZz::save_ab_shiftdir()
             _sta_absetting = AB_POINT_CMPLT;
             gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: shift right");
         }else if(channel_roll->get_control_in() < -300){
-            _shift_direction_cw = 0;
+            _shift_direction_cw = -1;
             _sta_absetting = AB_POINT_CMPLT;
             gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: shift left");
         }
@@ -446,7 +434,7 @@ bool Copter::ModeABZz::generate_abline(uint16_t shift_cnt)
 {
     //
     float shift_bearing_deg;
-    if(_shift_direction_cw){
+    if(_shift_direction_cw>=0){
         shift_bearing_deg = wrap_360(_ab_bearing_deg+90.0f);
     }else{
         shift_bearing_deg = wrap_360(_ab_bearing_deg-90.0f);
@@ -498,27 +486,29 @@ bool Copter::ModeABZz::generate_abline(uint16_t shift_cnt)
 
 
 //reset necessary mission data
+void Copter::ModeABZz::start_mission()
+{
+    _point_break.zero();
+    _flags.ab_bearing_set = false;
+    _flags.ab_brearing_reverse = false;
+}
+
+//reset necessary mission data
 void Copter::ModeABZz::reset_mission()
 {
     _point_break.zero();
-    _shift_count = 0;
+    _point_a.zero();
+    _point_b.zero();
+    _point_shift_b.zero();
+    _point_shift_a.zero();
     _sta_absetting = SAMPLE_A;
+    _sta_abzz = Start;
+    _shift_direction_cw = 1;
+    _shift_count = 0;
     _flags.ab_bearing_set = false;
     _flags.ab_brearing_reverse = false;
-    _shift_direction_cw = 1;
-    _cmd_auto = false;
-    _cmd_endmission = false;
-
 }
 
-// manual control to the pilot
-void Copter::ModeABZz::manual_start()
-{
-    _mode = Abzz_Manual;
-
-    loiter_nav->clear_pilot_desired_acceleration();
-    loiter_nav->init_target();
-}
 
 // auto_wp_start - initialises waypoint controller to implement flying to a particular destination
 bool Copter::ModeABZz::wp_start(const Vector3f& dest_vect)
@@ -598,37 +588,22 @@ bool Copter::ModeABZz::get_wp(Location_Class& destination)
     }
 }
 
-uint16_t _testcnt=0;
 
-// manual_control - process manual control
-void Copter::ModeABZz::manual_control_run()
+// loiter_run - loiter in BAZZ flight mode
+//      called by auto_run at 100hz or more
+void Copter::ModeABZz::loiter_run()
 {
+
+    // if not auto armed or motor interlock not enabled set throttle to zero and exit immediately
+    if (!motors->armed() || !ap.auto_armed || ap.land_complete || !motors->get_interlock()) {
+        zero_throttle_and_relax_ac();
+        return;
+    }
+
     float target_yaw_rate = 0.0f;
     float target_climb_rate = 0.0f;
 
-    // process pilot inputs unless we are in radio failsafe
-    if (!copter.failsafe.radio) {
-        float target_roll, target_pitch;
-        // apply SIMPLE mode transform to pilot inputs
-        update_simple_mode();
-
-        // convert pilot input to lean angles
-        get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), attitude_control->get_althold_lean_angle_max());
-
-        // process pilot's roll and pitch input
-        loiter_nav->set_pilot_desired_acceleration(target_roll, target_pitch, G_Dt);
-        // get pilot's desired yaw rate
-        target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
-
-        // get pilot desired climb rate
-        target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
-        // make sure the climb rate is in the given range, prevent floating point errors
-        target_climb_rate = constrain_float(target_climb_rate, -get_pilot_speed_dn(), g.pilot_speed_up);
-    } else {
-        // clear out pilot desired acceleration in case radio failsafe event occurs and we
-        // do not switch to RTL for some reason
-        loiter_nav->clear_pilot_desired_acceleration();
-    }
+    loiter_nav->clear_pilot_desired_acceleration();
 
     // set motors to full range
     motors->set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
@@ -639,23 +614,15 @@ void Copter::ModeABZz::manual_control_run()
     // call attitude controller
     attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(loiter_nav->get_roll(), loiter_nav->get_pitch(), target_yaw_rate);
 
-    // adjust climb rate using rangefinder
-    target_climb_rate = get_surface_tracking_climb_rate(target_climb_rate, pos_control->get_alt_target(), G_Dt);
-
-    // get avoidance adjusted climb rate
-    target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);
-
     // update altitude target and call position controller
     pos_control->set_alt_target_from_climb_rate_ff(target_climb_rate, G_Dt, false);
-    if(_testcnt++>200){
-        _testcnt = 0;
-        gcs().send_text(MAV_SEVERITY_INFO, " _pos_target.z=%f",testdat);
-    }
 
     // adjusts target up or down using a climb rate
     pos_control->update_z_controller();
 }
 
+
+uint16_t _testcnt=0;
 
 // auto_wp_run - runs the auto waypoint controller
 //      called by auto_run at 100hz or more
