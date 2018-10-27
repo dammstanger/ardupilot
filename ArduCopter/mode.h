@@ -1036,6 +1036,7 @@ public:
 #if PRECISION_LANDING == ENABLED
     void set_precision_loiter_enabled(bool value) { _precision_loiter_enabled = value; }
 #endif
+    void set_max_speed_xy(float speed_max);
 
 protected:
 
@@ -1055,7 +1056,7 @@ private:
 #if PRECISION_LANDING == ENABLED
     bool _precision_loiter_enabled;
 #endif
-
+    int16_t _speed_last;
 };
 
 
