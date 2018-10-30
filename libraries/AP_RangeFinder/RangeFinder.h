@@ -61,7 +61,9 @@ public:
         RangeFinder_TYPE_NMEA = 17,
         RangeFinder_TYPE_WASP = 18,
         RangeFinder_TYPE_BenewakeTF02 = 19,
-        RangeFinder_TYPE_BenewakeTFmini = 20
+        RangeFinder_TYPE_BenewakeTFmini = 20,
+        RangeFinder_TYPE_OATF_TF = 21,
+        RangeFinder_TYPE_OATF_OA = 22
     };
 
     enum RangeFinder_Function {
@@ -107,12 +109,12 @@ public:
     };
 
     static const struct AP_Param::GroupInfo *backend_var_info[RANGEFINDER_MAX_INSTANCES];
-    
+
     AP_Int16 _powersave_range;
 
     // parameters for each instance
     static const struct AP_Param::GroupInfo var_info[];
-    
+
     // Return the number of range finder instances
     uint8_t num_sensors(void) const {
         return num_instances;
@@ -178,7 +180,7 @@ private:
     Vector3f pos_offset_zero;   // allows returning position offsets of zero for invalid requests
 
     void detect_instance(uint8_t instance, uint8_t& serial_instance);
-    void update_instance(uint8_t instance);  
+    void update_instance(uint8_t instance);
 
     bool _add_backend(AP_RangeFinder_Backend *driver);
 };
