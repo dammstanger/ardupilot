@@ -50,14 +50,6 @@ const AP_Param::GroupInfo AC_Sprayer::var_info[] = {
 
 AC_Sprayer::AC_Sprayer()
 {
-    if (_s_instance) {
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-        AP_HAL::panic("Too many sprayers");
-#endif
-        return;
-    }
-    _s_instance = this;
-
     AP_Param::setup_object_defaults(this, var_info);
 
     // check for silly parameter values
@@ -70,15 +62,6 @@ AC_Sprayer::AC_Sprayer()
 
     _flags.automode = false;
     // To-Do: ensure that the pump and spinner servo channels are enabled
-}
-
-/*
- * Get the AP_Sprayer singleton
- */
-AC_Sprayer *AC_Sprayer::_s_instance = nullptr;
-AC_Sprayer *AC_Sprayer::get_instance()
-{
-    return _s_instance;
 }
 
 void AC_Sprayer::init()
@@ -233,12 +216,3 @@ void AC_Sprayer::update()
         stop_spraying();
     }
 }
-
-namespace AP {
-
-AC_Sprayer *sprayer()
-{
-    return AC_Sprayer::get_instance();
-}
-
-};

@@ -86,8 +86,8 @@ bool Copter::ModeABZz::init(bool ignore_checks)
 void Copter::ModeABZz::run()
 {
     // initialize vertical speed and acceleration's range
-    pos_control->set_max_speed_z(-get_pilot_speed_dn(), g.pilot_speed_up);
-    pos_control->set_max_accel_z(g.pilot_accel_z);
+    pos_control->set_speed_z(-get_pilot_speed_dn(), g.pilot_speed_up);
+    pos_control->set_accel_z(g.pilot_accel_z);
 
     // if not auto armed or motors not enabled set throttle to zero and exit immediately
     if (!motors->armed() || !ap.auto_armed || !motors->get_interlock() || ap.land_complete) {
