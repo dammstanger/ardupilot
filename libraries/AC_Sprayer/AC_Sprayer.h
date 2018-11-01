@@ -100,7 +100,7 @@ private:
     float _pump_grdspd_rate;
     int8_t _pump_manua_pct;
 
-    int8_t _ch_pump_spd=0;
+    int8_t _ch_pumpspeedchg_flg=0;
 
     void init();
     void stop_spraying();

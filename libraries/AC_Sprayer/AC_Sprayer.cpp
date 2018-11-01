@@ -101,9 +101,9 @@ void AC_Sprayer::run(const bool true_false)
 }
 
 
-void AC_Sprayer::change_pump_speed(const int8_t val)
+void AC_Sprayer::change_pump_speed(const int8_t flag_val)
 {
-    _ch_pump_spd = val;
+    _ch_pumpspeedchg_flg = flag_val;
 }
 void AC_Sprayer::stop_spraying()
 {
@@ -194,9 +194,9 @@ void AC_Sprayer::update()
             percent = _pump_min_pct + ground_speed * _pump_grdspd_rate;
         }else{
 
-            if(_ch_pump_spd==1){
+            if(_ch_pumpspeedchg_flg==1){
                 _pump_manua_pct += 9;
-            }else if(_ch_pump_spd==-1){
+            }else if(_ch_pumpspeedchg_flg==-1){
                 _pump_manua_pct -= 9;
             }
             _pump_manua_pct = MAX(_pump_manua_pct, 0);
