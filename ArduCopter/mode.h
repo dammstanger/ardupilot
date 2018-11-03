@@ -284,7 +284,7 @@ public:
     void save_ab_point(uint8_t get_b);
     void change_shiftwidth(uint16_t new_width_cm);
     void save_ab_shiftdir();
-    void exit_mode(bool end_mission);
+    void exit_ab_mode(bool end_mission);
     void start_mission();
     void reset_mission();
 

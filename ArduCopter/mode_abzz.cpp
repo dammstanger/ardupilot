@@ -276,7 +276,7 @@ void Copter::ModeABZz::update_abwp_sta()
     // any roll or pitch stick action will cause suspend
     if(channel_pitch->get_control_in() > 100 ||channel_pitch->get_control_in() < -100
         ||channel_roll->get_control_in() > 100 ||channel_roll->get_control_in() < -100){
-        exit_mode(false);
+        exit_ab_mode(false);
      }
 
     //change speed
@@ -284,16 +284,16 @@ void Copter::ModeABZz::update_abwp_sta()
     int16_t section;
     if(ch_spd<250){
         section = 100;
-        gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=100");
+//        gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=100");
     }else if(ch_spd>=250 && ch_spd <500){
         section = 300;
-        gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=300");
+//        gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: speed=300");
     }else if(ch_spd>=500 && ch_spd <750){
         section = 500;
-        gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=500");
+//        gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=500");
     }else if(ch_spd>=750){
         section = 700;
-        gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=700");
+//        gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=700");
     }
     if(section!=_speed_last){
         copter.wp_nav->set_speed_xy(section);
@@ -316,7 +316,7 @@ void Copter::ModeABZz::record_breakpoint()
     gcs().send_text(MAV_SEVERITY_INFO, "ABZz: break_point recorded");
 }
 
-void Copter::ModeABZz::exit_mode(bool end_mission)
+void Copter::ModeABZz::exit_ab_mode(bool end_mission)
 {
     if(end_mission){
         reset_mission();

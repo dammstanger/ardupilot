@@ -116,16 +116,16 @@ void Copter::ModeLoiter::run()
         int16_t section;
         if(ch_spd<250){
             section = 100;
-            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=100");
+//            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=100");
         }else if(ch_spd>=250 && ch_spd <500){
             section = 300;
-            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=300");
+//            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=300");
         }else if(ch_spd>=500 && ch_spd <750){
             section = 500;
-            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=500");
+//            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=500");
         }else if(ch_spd>=750){
             section = 700;
-            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=700");
+//            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=700");
         }
         if(section!=_speed_last){
             set_max_speed_xy(section);
