@@ -79,6 +79,7 @@ enum aux_sw_func {
     AUXSW_USER_FUNC2 =          48, // user function #2
     AUXSW_USER_FUNC3 =          49, // user function #3
     AUXSW_SPRAYER_PUMP_SPD =        50,//sprayer pump speed change
+    AUXSW_ABZZ_SaveWP =        51,          //ABzz mode save way point
     AUXSW_SWITCH_MAX,
 };
 
