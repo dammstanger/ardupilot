@@ -356,6 +356,13 @@ protected:
     MAV_RESULT handle_command_do_set_mode(const mavlink_command_long_t &packet);
     MAV_RESULT handle_command_get_home_position(const mavlink_command_long_t &packet);
 
+    //generally this should not be overridden; Copter overrides it to ensure
+    virtual MAV_RESULT handle_command_get_point_ab(const mavlink_command_long_t &packet) = 0;
+    virtual MAV_RESULT handle_command_clear_point_ab() = 0;
+    virtual MAV_RESULT handle_command_start_work(const mavlink_command_long_t &packet) = 0;
+    virtual MAV_RESULT handle_command_pause_work() = 0;
+    virtual MAV_RESULT handle_command_finish_work() = 0;
+
     // vehicle-overridable message send function
     virtual bool try_send_message(enum ap_message id);
 

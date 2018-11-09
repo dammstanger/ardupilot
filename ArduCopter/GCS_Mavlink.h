@@ -35,6 +35,12 @@ protected:
 
     void send_position_target_global_int() override;
 
+    MAV_RESULT handle_command_get_point_ab(const mavlink_command_long_t &packet) override;
+    MAV_RESULT handle_command_clear_point_ab() override;
+    MAV_RESULT handle_command_start_work(const mavlink_command_long_t &packet) override;
+    MAV_RESULT handle_command_pause_work() override;
+    MAV_RESULT handle_command_finish_work() override;
+
 private:
 
     void handleMessage(mavlink_message_t * msg) override;

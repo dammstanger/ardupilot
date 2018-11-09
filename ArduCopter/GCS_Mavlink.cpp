@@ -1722,3 +1722,116 @@ bool GCS_MAVLINK_Copter::set_mode(const uint8_t mode)
 #endif
     return copter.set_mode((control_mode_t)mode, MODE_REASON_GCS_COMMAND);
 }
+
+MAV_RESULT GCS_MAVLINK_Copter::handle_command_get_point_ab(const mavlink_command_long_t &packet)
+{
+#if MODE_ABZZ_ENABLED == ENABLED
+    if(copter.flightmode == &copter.mode_loiter) {
+        if(!copter.motors->armed() || copter.ap.land_complete){
+             gcs().send_text(MAV_SEVERITY_ERROR, "take off first.");
+             return MAV_RESULT_DENIED;
+        }
+
+        if(packet.command == MAV_CMD_GET_POINT_A){
+            copter.mode_abzz.sample_ab_point(0,copter.current_loc);
+        }else{
+            copter.mode_abzz.sample_ab_point(1,copter.current_loc);
+        }
+
+        return MAV_RESULT_ACCEPTED;
+    }else{
+        gcs().send_text(MAV_SEVERITY_ERROR, "Not in ab setting mode.");
+        return MAV_RESULT_DENIED;
+    }
+#else
+    return MAV_RESULT_UNSUPPORTED;
+#endif
+
+}
+
+MAV_RESULT GCS_MAVLINK_Copter::handle_command_clear_point_ab()
+{
+#if MODE_ABZZ_ENABLED == ENABLED
+    if(copter.flightmode != &copter.mode_abzz) {
+        if(copter.mode_abzz.clear_ab_point()){
+            return MAV_RESULT_ACCEPTED;
+        }else{
+            gcs().send_text(MAV_SEVERITY_ERROR, "failed to clear AB point");
+            return MAV_RESULT_DENIED;                
+        }
+    }else{
+        gcs().send_text(MAV_SEVERITY_ERROR, "Not in ab setting mode.");
+        return MAV_RESULT_DENIED;
+    }
+#else
+    return MAV_RESULT_UNSUPPORTED;
+#endif
+}
+
+MAV_RESULT GCS_MAVLINK_Copter::handle_command_start_work(const mavlink_command_long_t &packet)
+{
+    MAV_RESULT result = MAV_RESULT_FAILED;
+    if(copter.flightmode == &copter.mode_loiter) {
+        //1define as auto mode
+        if(is_equal(packet.param1,1.0f)){
+            if(set_mode(AUTO)) result = MAV_RESULT_ACCEPTED;
+            
+        //2define as abzz mode    
+        }else if(is_equal(packet.param1,2.0f)){
+#if MODE_ABZZ_ENABLED == ENABLED
+            if(set_mode(ABZZ)) result = MAV_RESULT_ACCEPTED;
+#else
+            result = MAV_RESULT_UNSUPPORTED;
+#endif
+        //other mode always accept
+        }else result = MAV_RESULT_ACCEPTED;
+    }else result = MAV_RESULT_TEMPORARILY_REJECTED;
+    
+    return result;
+  
+}
+
+MAV_RESULT GCS_MAVLINK_Copter::handle_command_pause_work()
+{
+     MAV_RESULT result = MAV_RESULT_FAILED;
+     gcs().send_text(MAV_SEVERITY_DEBUG, "In handle pause work");
+
+    if(copter.flightmode == &copter.mode_auto){
+        result = MAV_RESULT_ACCEPTED;
+#if MODE_ABZZ_ENABLED == ENABLED
+    }else if(copter.flightmode == &copter.mode_abzz){
+        //we only pause the mission keep the work status
+        if(copter.mode_abzz.exit_ab_mode(false)){
+            gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: exit by cmd");
+            result = MAV_RESULT_ACCEPTED;
+        }
+#else
+        result = MAV_RESULT_UNSUPPORTED;
+#endif
+    //other mode always accept
+    }else result = MAV_RESULT_ACCEPTED;
+    
+    return result;
+}
+
+MAV_RESULT GCS_MAVLINK_Copter::handle_command_finish_work()
+{
+     MAV_RESULT result = MAV_RESULT_FAILED;
+
+    if(copter.flightmode == &copter.mode_auto){
+        result = MAV_RESULT_ACCEPTED;
+#if MODE_ABZZ_ENABLED == ENABLED
+    }else if(copter.flightmode == &copter.mode_abzz){
+        //we only pause the mission keep the work status
+        if(copter.mode_abzz.exit_ab_mode(true)){
+            result = MAV_RESULT_ACCEPTED;
+        }
+#else
+        result = MAV_RESULT_UNSUPPORTED;
+#endif
+    //other mode always accept
+    }else result = MAV_RESULT_ACCEPTED;
+    
+    return result;
+}
+
