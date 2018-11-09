@@ -90,6 +90,9 @@ AC_WPNav::AC_WPNav(const AP_InertialNav& inav, const AP_AHRS_View& ahrs, AC_PosC
     _flags.new_wp_destination = false;
     _flags.segment_type = SEGMENT_STRAIGHT;
 
+    //initial a terrain following alt to default
+    _terrain_desired_alt = 200;
+
     // sanity check some parameters
     _wp_accel_cmss = MIN(_wp_accel_cmss, GRAVITY_MSS * 100.0f * tanf(ToRad(_attitude_control.lean_angle_max() * 0.01f)));
     _wp_radius_cm = MAX(_wp_radius_cm, WPNAV_WP_RADIUS_MIN);
@@ -154,6 +157,13 @@ void AC_WPNav::wp_and_spline_init()
     _pos_control.set_accel_z(_wp_accel_z_cmss);
     _pos_control.calc_leash_length_xy();
     _pos_control.calc_leash_length_z();
+
+    //pre init _origin _destination alt for agr work update_wpnav_agr()
+    //it will be overrided if we use normal update_wpnav()
+    set_wp_origin_and_destination_alt(_inav.get_altitude());
+
+    //initialise rangefinder status flag be used for update alt only
+    _flags._rangefinder_failed = true;
 
     // initialise yaw heading to current heading target
     _flags.wp_yaw_set = false;
@@ -225,6 +235,39 @@ bool AC_WPNav::set_wp_destination(const Vector3f& destination, bool terrain_alt)
     return set_wp_origin_and_destination(origin, destination, terrain_alt);
 }
 
+/// set_wp_destination waypoint using position vector (distance from home in cm)
+///need to be used with update by update_wp_alt() before update_wp_agr()
+bool AC_WPNav::set_wp_destination_xy(Vector3f& destination)
+{
+	Vector3f origin;
+
+    // if waypoint controller is active use the existing position target as the origin
+    if ((AP_HAL::millis() - _wp_last_update) < 1000) {
+        origin = _pos_control.get_pos_target();
+    } else {
+        // if waypoint controller is not active, set origin to reasonable stopping point (using curr pos and velocity)
+        _pos_control.get_stopping_point_xy(origin);
+//        _pos_control.get_stopping_point_z(origin);
+    }
+
+    // convert origin and destination with current _origin and _destination z
+        origin.z = _origin.z;
+        destination.z = _destination.z;
+
+    // set origin and destination terrain alt always set false because it will update by update_wp_alt() before update_wp_agr()
+    return set_wp_origin_and_destination(origin, destination, false);
+}
+
+//user need to check the altitude before setting
+// TODO:verify the validation of the desired alt
+void AC_WPNav::set_wp_desired_terrain_alt(const uint16_t desired_alt_cm)
+{
+    _terrain_desired_alt = desired_alt_cm;
+    _flags._change_terrain_alt = true;
+}
+
+
+
 /// set waypoint destination using NED position vector from ekf origin in meters
 bool AC_WPNav::set_wp_destination_NED(const Vector3f& destination_NED)
 {
@@ -286,13 +329,17 @@ bool AC_WPNav::set_wp_origin_and_destination(const Vector3f& origin, const Vecto
     return true;
 }
 
-//need to be call before advance update_wpnav
+//set_wp_origin_and_destination altitude the value, used with set_wp_origin_and_destination_xy()
 bool AC_WPNav::set_wp_origin_and_destination_alt(const float target_alt_cm)
 {
     // store origin and destination locations
     _origin.z = target_alt_cm;
     _destination.z = target_alt_cm;
 
+    // TODO: must be use calculate_wp_leash_length() if (_origin.z - _destination.z) change.
+
+//    //we change the alt use flag new waypoint so we can freeze the pos controller's feed forward and smooth the transition
+//    _flags.new_wp_destination = true;
     return true;
 }
 
@@ -492,7 +539,7 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
 }
 
 /// advance_wp_target_along_track - move target location along track from origin to destination
-bool AC_WPNav::advance_wp_xy_target_along_track(float dt)
+bool AC_WPNav::advance_wp_target_along_track_manual_alt(float dt, bool manual_alt)
 {
     float track_covered;        // distance (in cm) along the track that the vehicle has traveled.  Measured by drawing a perpendicular line from the track to the vehicle.
     Vector3f track_error;       // distance error (in cm) from the track_covered position (i.e. closest point on the line to the vehicle) and the vehicle
@@ -610,8 +657,11 @@ bool AC_WPNav::advance_wp_xy_target_along_track(float dt)
     Vector3f final_target = _origin + _pos_delta_unit * _track_desired;
     // convert final_target.z to altitude above the ekf origin
     final_target.z += terr_offset;
-    _pos_control.set_xy_target(final_target.x, final_target.y);
-//    _pos_control.set_pos_target(final_target);
+    
+    if(manual_alt)
+        _pos_control.set_xy_target(final_target.x, final_target.y);
+    else
+        _pos_control.set_pos_target(final_target);
 
     // check if we've reached the waypoint
     if( !_flags.reached_destination ) {
@@ -661,7 +711,7 @@ int32_t AC_WPNav::get_wp_bearing_to_destination() const
 {
     return get_bearing_cd(_inav.get_position(), _destination);
 }
-float testdat;
+//float testdat;
 
 /// update_wpnav - run the wp controller - should be called at 100hz or higher
 bool AC_WPNav::update_wpnav()
@@ -679,10 +729,9 @@ bool AC_WPNav::update_wpnav()
     _pos_control.set_accel_xy(_wp_accel_cmss);
     _pos_control.set_accel_z(_wp_accel_z_cmss);
 
-    testdat= _origin.z;
+//    testdat= _origin.z;
     // advance the target if necessary
-    if (!advance_wp_xy_target_along_track(dt)) {
-//    if (!advance_wp_target_along_track(dt)) {
+    if (!advance_wp_target_along_track(dt)) {
         // To-Do: handle inability to advance along track (probably because of missing terrain data)
         ret = false;
     }
@@ -700,6 +749,78 @@ bool AC_WPNav::update_wpnav()
 
     return ret;
 }
+
+
+void AC_WPNav::update_wp_alt(bool manual_alt)
+{
+    if(manual_alt){
+        Vector3f stop_point;
+        _pos_control.get_stopping_point_z(stop_point);
+        set_wp_origin_and_destination_alt(stop_point.z);
+        _flags._manual_alt = true;
+        _terrain_alt = false;
+
+    }else if(_rangefinder_available && _rangefinder_use && _rangefinder_healthy){
+        if(_flags._manual_alt  || _flags._change_terrain_alt || _flags._rangefinder_failed){
+            set_wp_origin_and_destination_alt(_terrain_desired_alt);
+            _flags._manual_alt = false;
+            _flags._change_terrain_alt = false;
+            _flags._rangefinder_failed = false;
+            }
+        _terrain_alt = true;
+    }else{
+        if( !_flags._rangefinder_failed){
+            Vector3f stop_point;
+            _pos_control.get_stopping_point_z(stop_point);
+            set_wp_origin_and_destination_alt(stop_point.z);
+            _flags._rangefinder_failed = true;
+        }
+        _flags._manual_alt = false;
+        _terrain_alt = false;
+    }
+
+}
+
+/// update_wpnav - run the wp controller - should be called at 100hz or higher
+/// alt_change_enable = true 
+bool AC_WPNav::update_wpnav_agr(bool manual_alt)
+{
+    bool ret = true;
+
+    // calculate dt
+    float dt = _pos_control.time_since_last_xy_update();
+    if (dt >= 0.2f) {
+        dt = 0.0f;
+    }
+
+    // allow the accel and speed values to be set without changing
+    // out of auto mode. This makes it easier to tune auto flight
+    _pos_control.set_accel_xy(_wp_accel_cmss);
+    _pos_control.set_accel_z(_wp_accel_z_cmss);
+
+    //now we update final desired wp alt and alt mode according to manual alt, rangefinder, terrain alt cmd
+    update_wp_alt(manual_alt);
+ 
+    //    testdat= _origin.z;
+    // advance the target if necessary
+        if (!advance_wp_target_along_track_manual_alt(dt, manual_alt)){
+            ret = false;
+        }
+        
+    // freeze feedforwards during known discontinuities
+    if (_flags.new_wp_destination) {
+        _flags.new_wp_destination = false;
+        _pos_control.freeze_ff_z();
+    }
+
+    _pos_control.update_xy_controller(1.0f);
+    check_wp_leash_length();
+
+    _wp_last_update = AP_HAL::millis();
+
+    return ret;
+}
+
 
 // check_wp_leash_length - check if waypoint leash lengths need to be recalculated
 //  should be called after _pos_control.update_xy_controller which may have changed the position controller leash lengths

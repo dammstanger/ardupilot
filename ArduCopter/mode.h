@@ -265,10 +265,16 @@ public:
     // inherit constructor
     using Copter::Mode::Mode;
 
+    typedef enum{
+        UPDATE_AB_REASON_CHGWD,
+        UPDATE_AB_REASON_GCSCMD
+    }ABUpdate_Reason_eu;
+
+
     ModeABZz(void):
 //        _point_a(Location_Class(225746990,1144842990, 500, Location_Class::ALT_FRAME_ABOVE_HOME)),
 //        _point_b(Location_Class(225749380,1144841840, 500, Location_Class::ALT_FRAME_ABOVE_HOME)),
-        _shift_width_cm(400)
+        _shift_width_cm(180)
         {}
     bool init(bool ignore_checks) override;
     void run() override;
@@ -281,15 +287,20 @@ public:
     // Abzz
     //    AbzzMode mode() const { return _mode; }
     void update_abwp_sta();
-    void save_ab_point(uint8_t get_b);
-    void change_shiftwidth(uint16_t new_width_cm);
-    void save_ab_shiftdir();
-    void exit_ab_mode(bool end_mission);
+    bool update_ab_point(Location_Class &loc_to_a, Location_Class &loc_to_b, uint8_t reason, uint8_t update_mask);
+    bool sample_ab_point(uint8_t get_b, Location_Class& loc);
+    bool clear_ab_point();
+    bool change_shiftwidth(uint16_t new_width_cm);
+    bool save_ab_shiftdir(int8_t direction);
+    void save_ab_shiftdir_RC();
+    bool exit_ab_mode(bool end_mission);
+    bool handle_RC_exit_ab_mode();
+
     void start_mission();
     void reset_mission();
 
 
-    bool wp_start(const Vector3f& destination);
+    bool wp_start(Vector3f& destination);
     bool wp_start(const Location_Class& dest_loc);
 
     void spline_start(const Vector3f& destination, bool stopped_at_start, AC_WPNav::spline_segment_end_type seg_end_type, const Vector3f& next_spline_destination);
@@ -317,10 +328,10 @@ private:
     bool check_ab_point_validity();
     bool check_break_point_validity();
     void calc_ab_bearing();
-    bool set_ab_alt(float new_alt_cm);
-    void generate_next_abline();
+    bool generate_next_abline();
     bool generate_abline(uint16_t shift_cnt);
     void record_breakpoint();
+    bool set_next_wp(Vector3f& dest_vect);
     void loiter_run();
     void wp_run();
     void spline_run();
@@ -340,32 +351,46 @@ private:
     }ABsample_sta_eu;
 
     typedef enum{
-        Start = 0,
+        StandBy = 0,
+        Start,
         Resume,
         GotoWork,
         AToB,
         BToA,
-        Brake
     }ABzz_sta_eu;
 
     struct{
         uint8_t ab_bearing_set:1;               //true if the bearing of ab point is set
         uint8_t ab_brearing_reverse:1;      //true if A and B point is reverse from the origin sampled
+        uint8_t work_alt_update_throttle:1;
     }_flags;
 
+    //ab point parameter
     AbzzMode _mode = Abzz_WP;           // controls which auto controller is run
     Location_Class _point_a;                    //position with abs lat and lng , but alt is above EKF_origin in cm
     Location_Class _point_b;
     Location_Class _point_break;
+    AP_Int32 _point_a_lat;                          //lat in 10^-7
+    AP_Int32 _point_a_lng;                          //lng in 10^-7
+    AP_Int32 _point_b_lat;                          //lat in 10^-7
+    AP_Int32 _point_b_lng;                          //lng in 10^-7
+    AP_Int32 _point_break_lat;                          //lat in 10^-7
+    AP_Int32 _point_break_lng;                          //lng in 10^-7
     Vector3f _point_shift_a;                    //position vector related to EKF_origin in cm NEU
     Vector3f _point_shift_b;
-
+    int32_t _terrain_cmd_alt_cm = 400;  //save command altitude from gcs
     uint16_t _shift_count = 0;
     ABsample_sta_eu _sta_absetting = SAMPLE_A;
-    ABzz_sta_eu _sta_abzz = Start;
+    ABzz_sta_eu _sta_abzz = StandBy;
+    ABzz_sta_eu _sta_abzz_last;
     float _ab_bearing_deg;
     uint16_t _shift_width_cm;
     int8_t _shift_direction_cw = 1;
+
+    //mutex
+    bool _mutex_ab_param=false;   //simple mutex to indicate if ab points are using
+    bool mutex_change_shiftwidth=false;   //simple mutex to indicate if ab points are updating
+
     uint16_t _speed_last;
 
     // Loiter control

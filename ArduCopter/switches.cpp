@@ -418,24 +418,34 @@ void Copter::do_aux_switch_function(int8_t ch_function, uint8_t ch_flag)
             break;
 
         case AUXSW_SPRAYER:
-#if SPRAYER_ENABLED == ENABLED
-            sprayer.run(ch_flag == AUX_SWITCH_HIGH);
-#endif
-            break;
-        case AUXSW_SPRAYER_PUMP_SPD:
-#if SPRAYER_ENABLED == ENABLED
+//#if SPRAYER_ENABLED == ENABLED
+//            sprayer.run(ch_flag == AUX_SWITCH_HIGH);
+//#endif
+//            break;
+//        case AUXSW_SPRAYER_PUMP_SPD:
+//#if SPRAYER_ENABLED == ENABLED
+//            switch(ch_flag) {
+//                case AUX_SWITCH_LOW:
+//                    sprayer.change_pump_speed(-1);
+//                    break;
+//                case AUX_SWITCH_MIDDLE:
+//                    sprayer.change_pump_speed(0);
+//                    break;
+//                case AUX_SWITCH_HIGH:
+//                    sprayer.change_pump_speed(1);
+//                    break;
+//            }
+//#endif
             switch(ch_flag) {
                 case AUX_SWITCH_LOW:
-                    sprayer.change_pump_speed(-1);
+                    handle_command_clear_point_ab();
                     break;
                 case AUX_SWITCH_MIDDLE:
-                    sprayer.change_pump_speed(0);
                     break;
                 case AUX_SWITCH_HIGH:
-                    sprayer.change_pump_speed(1);
+                    handle_command_start_work(2.0f);
                     break;
             }
-#endif
             break;
 
         case AUXSW_AUTOTUNE:
@@ -764,12 +774,12 @@ void Copter::do_aux_switch_function(int8_t ch_function, uint8_t ch_flag)
             }
             switch (ch_flag) {
                 case AUX_SWITCH_LOW:
-                    copter.mode_abzz.save_ab_point(0);
+                    copter.mode_abzz.sample_ab_point(0,copter.current_loc);
                     break;
                 case AUX_SWITCH_MIDDLE:
                     break;
                 case AUX_SWITCH_HIGH:
-                    copter.mode_abzz.save_ab_point(1);
+                    copter.mode_abzz.sample_ab_point(1,copter.current_loc);
                     break;
             }
         }
@@ -816,4 +826,96 @@ void Copter::auto_trim()
         }
     }
 }
+
+//=============================================================
+int8_t Copter::handle_command_clear_point_ab()
+{
+#if MODE_ABZZ_ENABLED == ENABLED
+    if(copter.flightmode != &copter.mode_abzz) {
+        gcs().send_text(MAV_SEVERITY_DEBUG, "we clear AB point");
+        if(copter.mode_abzz.clear_ab_point()){
+             gcs().send_text(MAV_SEVERITY_DEBUG, "clear successfully");
+            return MAV_RESULT_ACCEPTED;
+        }else{
+            gcs().send_text(MAV_SEVERITY_ERROR, "in wrong AB mode state");
+            return MAV_RESULT_DENIED;                
+        }
+    }else{
+        gcs().send_text(MAV_SEVERITY_ERROR, "Not in ab setting mode.");
+        return MAV_RESULT_DENIED;
+    }
+#else
+    return MAV_RESULT_UNSUPPORTED;
+#endif
+}
+
+int8_t Copter::handle_command_start_work(float par)
+{
+    MAV_RESULT result = MAV_RESULT_FAILED;
+    if(copter.flightmode == &copter.mode_loiter) {
+        //1define as auto mode
+        if(is_equal(par,1.0f)){
+            if(set_mode(AUTO,MODE_REASON_GCS_COMMAND)) result = MAV_RESULT_ACCEPTED;
+            
+        //2define as abzz mode    
+        }else if(is_equal(par,2.0f)){
+            gcs().send_text(MAV_SEVERITY_DEBUG, "we start AB point");
+#if MODE_ABZZ_ENABLED == ENABLED
+            if(set_mode(ABZZ, MODE_REASON_GCS_COMMAND)) result = MAV_RESULT_ACCEPTED;
+#else
+            result = MAV_RESULT_UNSUPPORTED;
+#endif
+        //other mode always accept
+        }else result = MAV_RESULT_ACCEPTED;
+    }else result = MAV_RESULT_TEMPORARILY_REJECTED;
+    
+    return result;
+  
+}
+
+int8_t Copter::handle_command_pause_work()
+{
+     MAV_RESULT result = MAV_RESULT_FAILED;
+     gcs().send_text(MAV_SEVERITY_DEBUG, "In handle pause work");
+
+    if(copter.flightmode == &copter.mode_auto){
+        result = MAV_RESULT_ACCEPTED;
+#if MODE_ABZZ_ENABLED == ENABLED
+    }else if(copter.flightmode == &copter.mode_abzz){
+        //we only pause the mission keep the work status
+        if(copter.mode_abzz.exit_ab_mode(false)){
+            gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: exit by cmd");
+            result = MAV_RESULT_ACCEPTED;
+        }
+#else
+        result = MAV_RESULT_UNSUPPORTED;
+#endif
+    //other mode always accept
+    }else result = MAV_RESULT_ACCEPTED;
+    
+    return result;
+}
+
+int8_t Copter::handle_command_finish_work()
+{
+     MAV_RESULT result = MAV_RESULT_FAILED;
+
+    if(copter.flightmode == &copter.mode_auto){
+        result = MAV_RESULT_ACCEPTED;
+#if MODE_ABZZ_ENABLED == ENABLED
+    }else if(copter.flightmode == &copter.mode_abzz){
+        //we only pause the mission keep the work status
+        if(copter.mode_abzz.exit_ab_mode(true)){
+            result = MAV_RESULT_ACCEPTED;
+        }
+#else
+        result = MAV_RESULT_UNSUPPORTED;
+#endif
+    //other mode always accept
+    }else result = MAV_RESULT_ACCEPTED;
+    
+    return result;
+}
+
+
 

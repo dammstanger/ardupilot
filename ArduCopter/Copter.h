@@ -908,6 +908,10 @@ private:
     bool debounce_aux_switch(uint8_t chan, uint8_t ch_flag);
     void save_trim();
     void auto_trim();
+    int8_t handle_command_clear_point_ab();
+    int8_t handle_command_start_work(float par);
+    int8_t handle_command_pause_work();
+    int8_t handle_command_finish_work();
 
     // system.cpp
     void init_ardupilot();
