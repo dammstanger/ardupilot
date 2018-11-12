@@ -332,6 +332,10 @@ private:
     bool generate_abline(uint16_t shift_cnt);
     void record_breakpoint();
     bool set_next_wp(Vector3f& dest_vect);
+    void init_sprayer();
+    void operate_sprayer(const bool enable);
+
+    
     void loiter_run();
     void wp_run();
     void spline_run();

@@ -73,6 +73,8 @@ bool Copter::ModeABZz::init(bool ignore_checks)
         pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
     }
 
+    //init sprayer system to adapt auto mode
+    init_sprayer();
     // initialise waypoint and spline controller
     wp_nav->wp_and_spline_init();
 
@@ -259,6 +261,8 @@ void Copter::ModeABZz::update_abwp_sta()
 
             if(set_next_wp(_point_shift_b)){
                 _sta_abzz = AToB;
+                //enable sprayer
+                operate_sprayer(true);
             }else{
                 gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
                 exit_ab_mode(false);
@@ -296,6 +300,8 @@ void Copter::ModeABZz::update_abwp_sta()
 
             if(set_next_wp(_point_shift_a)){
                 _sta_abzz = BToA;
+                //enable sprayer
+                operate_sprayer(false);
                 gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: AToB set_next_wp");
             }else{
                 gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
@@ -327,6 +333,8 @@ void Copter::ModeABZz::update_abwp_sta()
 
             if(set_next_wp(_point_shift_b)){
                 _sta_abzz = AToB;
+                //enable sprayer
+                operate_sprayer(false);
                 gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: BToA set_next_wp");
             }else{
                 gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
@@ -340,7 +348,6 @@ void Copter::ModeABZz::update_abwp_sta()
                  _sta_abzz_last = GotoWork;
                  gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: exit from BToA");
             }
-
          }
         break;
 
@@ -699,7 +706,6 @@ bool Copter::ModeABZz::wp_start(const Location_Class& dest_loc)
 
 }
 
-float testdat;
 bool Copter::ModeABZz::set_next_wp(Vector3f& dest_vect)
 {
 
@@ -789,8 +795,7 @@ void Copter::ModeABZz::loiter_run()
 }
 
 
-uint16_t _testcnt=0;
-float _testdat2;
+//uint16_t _testcnt=0;
 // auto_wp_run - runs the auto waypoint controller
 //      called by auto_run at 100hz or more
 void Copter::ModeABZz::wp_run()
@@ -839,13 +844,11 @@ void Copter::ModeABZz::wp_run()
     }else{
         copter.failsafe_terrain_set_status(wp_nav->update_wpnav_agr(false));
     }
-
-    _testdat2 = pos_control->get_alt_target();
     
-    if(_testcnt++>200){
-        _testcnt = 0;
-        gcs().send_text(MAV_SEVERITY_INFO, " dest_vect.z=%f, _pos_target.z=%f",testdat, _testdat2);
-    }
+//    if(_testcnt++>200){
+//        _testcnt = 0;
+//        gcs().send_text(MAV_SEVERITY_INFO, " dest_vect.z=%f, _pos_target.z=%f",_testdat, _testdat2);
+//    }
 
     // call z-axis position controller (wpnav should have already updated it's alt target)
     pos_control->update_z_controller();
@@ -1058,6 +1061,18 @@ bool Copter::ModeABZz::verify_nav_wp()
     } else {
         return false;
     }
+}
+
+//operate_sprayer according to force disable spraying flag
+void Copter::ModeABZz::operate_sprayer(const bool enable)
+{
+    copter.sprayer.handle_cmd_auto(enable);
+}
+
+
+void Copter::ModeABZz::init_sprayer()
+{
+    copter.sprayer.set_pump_mode(AC_Sprayer::Auto);
 }
 
 
