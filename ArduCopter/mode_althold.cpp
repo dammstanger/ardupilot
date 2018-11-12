@@ -16,6 +16,7 @@ bool Copter::ModeAltHold::init(bool ignore_checks)
 
     return true;
 }
+uint16_t _testcnt;
 
 // althold_run - runs the althold controller
 // should be called at 100hz or more
@@ -23,6 +24,10 @@ void Copter::ModeAltHold::run()
 {
     AltHoldModeState althold_state;
     float takeoff_climb_rate = 0.0f;
+    if(_testcnt++>200){
+        _testcnt = 0;
+        gcs().send_text(MAV_SEVERITY_INFO, " sprayer_state=%f, =%f",_testdat, _testdat2);
+    }
 
     // initialize vertical speeds and acceleration
     pos_control->set_speed_z(-get_pilot_speed_dn(), g.pilot_speed_up);

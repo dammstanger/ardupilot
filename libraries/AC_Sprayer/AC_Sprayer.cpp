@@ -1,6 +1,8 @@
 #include <AP_HAL/AP_HAL.h>
 #include "AC_Sprayer.h"
-
+float _testdat;
+float _testdat2;
+float _testspd;
 extern const AP_HAL::HAL& hal;
 
 // ------------------------------
@@ -59,47 +61,91 @@ AC_Sprayer::AC_Sprayer()
     if (_spinner_pwm < 0) {
         _spinner_pwm.set_and_save(AC_SPRAYER_DEFAULT_SPINNER_PWM);
     }
-
-    _flags.automode = false;
+    _flags.inited = false;
     // To-Do: ensure that the pump and spinner servo channels are enabled
 }
 
+bool AC_Sprayer::running()const
+{
+    return _state==Running;
+}
 void AC_Sprayer::init()
 {
+    _cmd_auto_enable = true;
+    _triggle_auto = false;
+    _triggle_manual = false;
+    _triggle_tankempty = false;
+    _flags.levelsensor_hasliq = false;
+
+    _pump_manual_pct = 50;
     _pump_grdspd_rate = (100.0f -AC_SPRAYER_DEFAULT_PUMP_MIN)/(500.0f - 100.0f);
 
     SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_pump, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
     SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_spinner, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+    _testdat2= 1100.0f;
+}
+
+//set max flight ground speed for auto spraying.
+void AC_Sprayer::set_max_ground_speed(int16_t speed_cms)
+{
+    if(speed_cms<=_speed_min){
+        _pump_grdspd_rate = 100.0f;
+        return ;
+    //as for agr vehicles, we default limit max speed no more than 10m/s
+    }else if(speed_cms>1000.0f){
+        speed_cms = 1000.0f;
+    }
+    //update ratio from ground speed to pump rate
+    _pump_grdspd_rate = (100.0f -AC_SPRAYER_DEFAULT_PUMP_MIN)/(speed_cms - 100.0f);
 }
 
 
-void AC_Sprayer::run(const bool true_false)
+//it will be inited by aux init
+void AC_Sprayer::handle_cmd_manual(const bool true_false)
 {
     //init output value if not init
     if(!_flags.inited){
         init();
         _flags.inited = true;
-        _flags.running = false;
-        _pump_manua_pct = 50;
     }else if(true_false){
-        // return immediately if no change
-        if (_flags.running) {
-            _flags.running = false;
-        }else{
-        // set flag indicate whether spraying is permitted:
-        // do not allow running to be set to true if we are currently not enabled
-            _flags.running = _enabled;
-        }
-    }else{
-        return ;
-    }
-
-    // turn off the pump and spinner servos if necessary
-    if (!_flags.running) {
-        stop_spraying();
+        _triggle_manual = true;
     }
 }
 
+
+//we devide cmd into manual and auto, so we can handle it differently 
+void AC_Sprayer::handle_cmd_auto(const bool enable)
+{
+    //init output value if not init
+    if(!_flags.inited){
+        init();
+        _flags.inited = true;
+    }else{
+        _triggle_auto = true;
+        _cmd_auto_enable = enable;
+    }
+}
+bool agr_level_sens = true;
+void AC_Sprayer::check_tankempty()
+{
+// TODO: get level sensor status from agr module and the flow sensor
+//    bool agr_level_sens = true;
+    if(agr_level_sens==false && _flags.levelsensor_hasliq==true){
+        _triggle_tankempty = true;
+    }
+     _flags.levelsensor_hasliq = agr_level_sens;
+}
+
+//set pump mode used when in or out auto agrmode and calibration
+void AC_Sprayer::set_pump_mode(Pump_mode_en mode)
+{
+    if(mode==Auto){
+        //we force _state to Suspend once when we are begin to inter auto agrmode
+        _state = Suspend;
+        _testdat = 99;
+    }
+    _pump_mode = mode;
+}
 
 void AC_Sprayer::change_pump_speed(const int8_t flag_val)
 {
@@ -109,27 +155,87 @@ void AC_Sprayer::stop_spraying()
 {
     SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_pump, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
     SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_spinner, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
-
+    _testdat2= 1100.0f;
     _flags.spraying = false;
 }
 
 /// update - adjust pwm of servo controlling pump speed according to the desired quantity and our horizontal speed
 void AC_Sprayer::update()
 {
-    // exit immediately if we are disabled or shouldn't be running
-    if (!_enabled || !running()) {
-        run(false);
-        return;
+    //check if tank is empty
+    check_tankempty();
+
+    switch(_state){
+        case Stop :
+            _testdat = 0;
+            //we need system enable or nothing will happen
+            if(_enabled){
+                if(_triggle_manual){
+                    _state = Running;
+                    _triggle_manual = false;
+                }
+             }
+                
+            if(_triggle_tankempty || _triggle_auto){
+                _triggle_auto = false;
+                _triggle_tankempty = false;
+             }
+            break;
+
+        case Suspend :
+            _testdat = 1;
+            if(_enabled){
+                if(_triggle_manual || (_triggle_auto && _cmd_auto_enable)){
+                    _state = Running;
+                    _triggle_auto = false;
+                    _triggle_manual = false;
+                }
+            }else{
+                if(_triggle_tankempty){
+                    _triggle_tankempty = false;
+                }
+                _state = Stop;
+            }
+            break;
+
+        case Running :
+            _testdat = 2;
+            if(_triggle_manual || _triggle_tankempty){
+                _state = Stop;
+                _triggle_manual = false;
+                _triggle_tankempty = false;
+            }else if(_triggle_auto && !_cmd_auto_enable){
+                _state = Suspend;
+                _triggle_auto = false;
+            }
+             break;
+         default:
+            _state = Stop;
+            break;
     }
 
+    //
+    update_pump_controller();
+}
+
+/// update - adjust pwm of servo controlling pump speed according to the desired quantity and our horizontal speed
+void AC_Sprayer::update_pump_controller()
+{
     // exit immediately if the pump function has not been set-up for any servo
     if (!SRV_Channels::function_assigned(SRV_Channel::k_sprayer_pump)) {
         return;
     }
 
+    // exit immediately if we are disabled or shouldn't be running
+    if (_state!=Running) {
+        if(_flags.spraying) stop_spraying();
+        
+        return;
+    }
+    
     bool should_be_spraying = _flags.spraying;
     float ground_speed = 0;
-    if(_flags.automode){
+    if(_pump_mode==Auto){
         // get horizontal velocity
         Vector3f velocity;
         if (!AP::ahrs().get_velocity_NED(velocity)) {
@@ -137,7 +243,10 @@ void AC_Sprayer::update()
             // velocity will already be zero but this avoids a coverity warning
             velocity.zero();
         }
-        ground_speed = norm(velocity.x * 100.0f, velocity.y * 100.0f);
+//        ground_speed = norm(velocity.x * 100.0f, velocity.y * 100.0f);
+            _testspd += 20;
+            if(_testspd>=500) _testspd = 0;
+            ground_speed = _testspd;
 
         // get the current time
         const uint32_t now = AP_HAL::millis();
@@ -181,38 +290,42 @@ void AC_Sprayer::update()
         should_be_spraying = true;
     }
 
-    // if testing pump output speed as if traveling at 1m/s
-//    if (_flags.testing) {
-//        ground_speed = 100.0f;
-//        should_be_spraying = true;
-//    }
-
-    // if spraying or testing update the pump servo position
+    // if spraying or testing update the pump servo
     if (should_be_spraying) {
         int8_t percent = _pump_min_pct;
-        if(_flags.automode){
-            percent = _pump_min_pct + ground_speed * _pump_grdspd_rate;
-        }else{
-
-            if(_ch_pumpspeedchg_flg==1){
-                _pump_manua_pct += 9;
-            }else if(_ch_pumpspeedchg_flg==-1){
-                _pump_manua_pct -= 9;
+        if(_pump_mode==Auto){
+            if(ground_speed > _speed_min){
+                percent = _pump_min_pct + (ground_speed -_speed_min)  * _pump_grdspd_rate;
+            }else{
+                percent = _pump_min_pct;
             }
-            _pump_manua_pct = MAX(_pump_manua_pct, 0);
-            _pump_manua_pct = MIN(_pump_manua_pct,100);
-            percent = _pump_min_pct + _pump_manua_pct;
+            
+        }else if(_pump_mode==Calibr){
+            percent = 100;
+        }else{
+            if(_ch_pumpspeedchg_flg==1){
+                _pump_manual_pct += 9;
+            }else if(_ch_pumpspeedchg_flg==-1){
+                _pump_manual_pct -= 9;
+            }
+            _pump_manual_pct = MAX(_pump_manual_pct, 0);
+            _pump_manual_pct = MIN(_pump_manual_pct,100);
+            percent = _pump_min_pct + _pump_manual_pct;
         }
         percent = MAX(percent, _pump_min_pct); // ensure min pump speed
         percent = MIN(percent,100);     // clamp to range
 
+        //we use _pump_pct_1ms as the k transfer percent to pwm.
         int16_t pump_pwm = AC_SPRAYER_DEFAULT_PUMP_STOP_PWM + percent * _pump_pct_1ms;
         constrain_int16(pump_pwm,AC_SPRAYER_DEFAULT_PUMP_STOP_PWM, AC_SPRAYER_DEFAULT_PUMP_MAX_PWM);
 
         SRV_Channels::set_output_pwm(SRV_Channel::k_sprayer_pump, pump_pwm);
 //        SRV_Channels::set_output_pwm(SRV_Channel::k_sprayer_spinner, _spinner_pwm);
         _flags.spraying = true;
+        _testdat2= pump_pwm;
+
     } else {
         stop_spraying();
+        _testdat2= 1100.0f;
     }
 }

@@ -418,34 +418,47 @@ void Copter::do_aux_switch_function(int8_t ch_function, uint8_t ch_flag)
             break;
 
         case AUXSW_SPRAYER:
-//#if SPRAYER_ENABLED == ENABLED
-//            sprayer.run(ch_flag == AUX_SWITCH_HIGH);
-//#endif
-//            break;
-//        case AUXSW_SPRAYER_PUMP_SPD:
-//#if SPRAYER_ENABLED == ENABLED
-//            switch(ch_flag) {
-//                case AUX_SWITCH_LOW:
-//                    sprayer.change_pump_speed(-1);
-//                    break;
-//                case AUX_SWITCH_MIDDLE:
-//                    sprayer.change_pump_speed(0);
-//                    break;
-//                case AUX_SWITCH_HIGH:
-//                    sprayer.change_pump_speed(1);
-//                    break;
-//            }
-//#endif
+#if SPRAYER_ENABLED == ENABLED
+            sprayer.handle_cmd_manual(ch_flag == AUX_SWITCH_HIGH);
+#endif
+            break;
+        case AUXSW_SPRAYER_PUMP_SPD:
+#if SPRAYER_ENABLED == ENABLED
+        if(sprayer.get_pump_mode()==AC_Sprayer::Manual){
             switch(ch_flag) {
                 case AUX_SWITCH_LOW:
-                    handle_command_clear_point_ab();
+                    sprayer.change_pump_speed(-1);
+                    break;
+                case AUX_SWITCH_MIDDLE:
+                    sprayer.change_pump_speed(0);
+                    break;
+                case AUX_SWITCH_HIGH:
+                    sprayer.change_pump_speed(1);
+                    break;
+            }
+        }else{
+            switch(ch_flag) {
+                case AUX_SWITCH_LOW:
+                    sprayer.handle_cmd_auto(false);
                     break;
                 case AUX_SWITCH_MIDDLE:
                     break;
                 case AUX_SWITCH_HIGH:
-                    handle_command_start_work(2.0f);
+                    sprayer.handle_cmd_auto(true);
                     break;
-            }
+            }            
+        }
+#endif
+//            switch(ch_flag) {
+//                case AUX_SWITCH_LOW:
+//                    handle_command_clear_point_ab();
+//                    break;
+//                case AUX_SWITCH_MIDDLE:
+//                    break;
+//                case AUX_SWITCH_HIGH:
+//                    handle_command_start_work(2.0f);
+//                    break;
+//            }
             break;
 
         case AUXSW_AUTOTUNE:
@@ -766,6 +779,18 @@ void Copter::do_aux_switch_function(int8_t ch_function, uint8_t ch_flag)
 #endif
 
     case AUXSW_ABZZ_SaveWP:
+    
+    switch (ch_flag) {
+            case AUX_SWITCH_LOW:
+                agr_level_sens = !agr_level_sens;
+                gcs().send_text(MAV_SEVERITY_DEBUG, "agr_level_sens=%u",agr_level_sens);
+                break;
+            case AUX_SWITCH_MIDDLE:
+                break;
+            case AUX_SWITCH_HIGH:
+                copter.sprayer.set_pump_mode(AC_Sprayer::Auto);
+                break;
+        }
 #if MODE_ABZZ_ENABLED == ENABLED
         if (copter.flightmode == &copter.mode_loiter) {
             if(!motors->armed() || ap.land_complete){
