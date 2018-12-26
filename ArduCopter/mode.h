@@ -334,6 +334,8 @@ private:
     bool generate_abline(uint16_t shift_cnt);
     void record_breakpoint();
     bool set_next_wp(Vector3f& dest_vect);
+    bool set_work_speed(const uint16_t speed);
+    void update_work_speed();
     void set_sprayer_auto();
     void set_sprayer_manual();
     void operate_sprayer(const bool enable);
@@ -398,6 +400,10 @@ private:
     bool _mutex_ab_param=false;   //simple mutex to indicate if ab points are using
     bool mutex_change_shiftwidth=false;   //simple mutex to indicate if ab points are updating
 
+    //work speed limit
+    uint16_t _maxspeed_cms;
+    uint16_t _pilot_desired_speed_cms = 5;
+
     // Loiter control
     uint16_t loiter_time_max;                // How long we should stay in Loiter Mode for mission scripting (time in seconds)
     uint32_t loiter_time;                    // How long have we been loitering - The start time in millis
@@ -405,7 +411,7 @@ private:
 //    Location_Class terrain_adjusted_location(const AP_Mission::Mission_Command& cmd) const;
 
 //    void auto_spline_start(const Location_Class& destination, bool stopped_at_start, AC_WPNav::spline_segment_end_type seg_end_type, const Location_Class& next_destination);
-
+    float _override_speed_cms;
 
 };
 #endif

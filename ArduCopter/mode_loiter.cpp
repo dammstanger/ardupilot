@@ -126,7 +126,7 @@ void Copter::ModeLoiter::run()
             section = 500;
 //            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=500");
         }else if(ch_spd>=750){
-            section = 700;
+            section = 800;
 //            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: speed=700");
         }
         if(section!=_override_speed_cms){
