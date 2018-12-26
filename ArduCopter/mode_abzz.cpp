@@ -77,7 +77,9 @@ bool Copter::ModeABZz::init(bool ignore_checks)
 
     //init sprayer system to adapt auto mode
     set_sprayer_auto();
+
     // initialise waypoint and spline controller
+    _maxspeed_cms = wp_nav->get_speed_xy();
     wp_nav->wp_and_spline_init();
 
     //controller mode should be set to loiter to prevent run in unexperted status
@@ -128,6 +130,9 @@ void Copter::ModeABZz::run_autopilot()
 {
     //update_abwp_sta
     update_abwp_sta();
+
+    //update_work_speed
+    update_work_speed();
 }
 
 
@@ -358,6 +363,25 @@ void Copter::ModeABZz::update_abwp_sta()
     }
 
 //        copter.wp_nav->set_speed_xy(section);
+//----------------------------------
+        //change speed
+        int16_t ch_spd = channel_speed->get_control_in();
+        int16_t section;
+        if(ch_spd<250){
+            section = 100;
+        }else if(ch_spd>=250 && ch_spd <480){
+            section = 300;
+        }else if(ch_spd>=480 && ch_spd <750){
+            section = 500;
+        }else if(ch_spd>=750){
+            section = 800;
+        }
+        if(section!=_pilot_desired_speed_cms){
+            _pilot_desired_speed_cms = section;
+        }
+
+//----------------------------------
+
 
 }
 
@@ -629,6 +653,33 @@ bool Copter::ModeABZz::generate_abline(uint16_t shift_cnt)
 //    location_update(_point_shift_b, );
 
     return true;
+}
+
+bool Copter::ModeABZz::set_work_speed(const uint16_t speed)
+{
+    if(speed > WPNAV_WP_SPEED_MIN && speed < 1000){
+        _pilot_desired_speed_cms = speed;
+        return true;
+    }else return false;
+}
+
+void Copter::ModeABZz::update_work_speed()
+{
+    bool val_change=false;
+    //slow down speed limit change when speed limit decrease
+    int16_t speed_limit_err = _pilot_desired_speed_cms - _maxspeed_cms;
+    
+    if(speed_limit_err < -5){
+        _maxspeed_cms -= 5;
+        val_change = true;
+    }else if(speed_limit_err!=0){//if(!is_equal(speed_limit_err, 0.0f)){
+        _maxspeed_cms += speed_limit_err;
+        val_change = true;
+    }
+    
+    if(val_change){
+        copter.wp_nav->set_speed_xy(_maxspeed_cms);
+    }
 }
 
 //reset necessary mission data
