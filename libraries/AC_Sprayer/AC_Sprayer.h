@@ -31,6 +31,9 @@
 #define AC_SPRAYER_DEFAULT_TURN_ON_DELAY    100     ///< delay between when we reach the minimum speed and we begin spraying.  This reduces the likelihood of constantly turning on/off the pump
 #define AC_SPRAYER_DEFAULT_SHUT_OFF_DELAY   1000    ///< shut-off delay in milli seconds.  This reduces the likelihood of constantly turning on/off the pump
 
+#define AC_SPRAYER_DEFAULT_FLUX_MIN         1000.0f
+#define AC_SPRAYER_DEFAULT_FLUX_MAX         6000.0f
+
 //#define AC_SPRAYER_DEFAULT_PUMP_RATE        10.0f   ///< default quantity of spray per meter travelled
 //#define AC_SPRAYER_DEFAULT_PUMP_MIN         0       ///< default minimum pump speed expressed as a percentage from 0 to 100
 //#define AC_SPRAYER_DEFAULT_SPINNER_PWM      1300    ///< default speed of spinner (higher means spray is throw further horizontally
@@ -61,11 +64,12 @@ public:
     Pump_mode_en get_pump_mode() const {return _pump_mode;};
 
 #if HAL_WITH_UAVCAN
-	bool set_agr(float vel, float fluid, uint8_t velBase);
+    //set target flux and target flight speed at which flux reach the target set by user for accurate dose
+    bool set_target_flux_speed(int16_t flux, int16_t speed_cms);
+#else
+    //set flight ground speed at which pump percentatge reach its max for auto speed following spraying.
+    void set_max_pump_pct_gndspeed(int16_t speed_cms);
 #endif
-
-    //set max flight ground speed for auto spraying.
-    void set_max_ground_speed(int16_t speed_cms);
 
     void change_pump_speed(const int8_t val);
 
@@ -94,15 +98,19 @@ private:
     void stop_spraying();
     void check_tankempty();
     void update_pump_controller();
+#if HAL_WITH_UAVCAN
+        bool set_agr(float vel, float fluid, uint8_t velBase);
+ #endif
 
     // parameters
     AP_Int8         _enabled;               ///< top level enable/disable control
     AP_Float        _pump_pct_1ms;          ///<now we use _pump_pct_1ms as coeffecient to transfer pump percent(0-100) to delta PWM of pump ESC range
-    AP_Int8         _pump_min_pct;          ///< minimum pump rate (expressed as a percentage from 0 to 100)
 //    AP_Float        _pump_pct_1ms;          ///< desired pump rate (expressed as a percentage of top rate) when travelling at 1m/s
-//    AP_Int8         _pump_min_pct;          ///< minimum pump rate (expressed as a percentage from 0 to 100)
+    AP_Int8         _pump_min_pct;          ///< minimum pump rate (expressed as a percentage from 0 to 100)
     AP_Int16        _spinner_pwm;           ///< pwm rate of spinner
     AP_Float        _speed_min;             ///< minimum speed in cm/s above which the sprayer will be started
+    AP_Int16        _flux_min;               ///
+    AP_Int16        _flux_max;
 
     /// flag bitmask
     struct sprayer_flags_type {
@@ -129,9 +137,14 @@ private:
 
 // pump relevant parameters
     Pump_mode_en _pump_mode=Manual;
-
-    float _pump_grdspd_rate;
+#if HAL_WITH_UAVCAN
+    int16_t _manual_flux;
+    float _rate_spd_to_flux;
+    int16_t _flux_dbg;
+#else
+    float _rate_spd_to_pumpct;
     int8_t _pump_manual_pct;
+#endif
     int8_t _ch_pumpspeedchg_flg=0;
 
 };

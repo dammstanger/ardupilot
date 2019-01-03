@@ -1,5 +1,6 @@
 #include <AP_HAL/AP_HAL.h>
 #include "AC_Sprayer.h"
+#include <GCS_MAVLink/GCS.h>
 
 #if HAL_WITH_UAVCAN
 #include <AP_UAVCAN/AP_UAVCAN.h>
@@ -51,6 +52,22 @@ const AP_Param::GroupInfo AC_Sprayer::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("PUMP_MIN",   4, AC_Sprayer, _pump_min_pct, AC_SPRAYER_DEFAULT_PUMP_MIN),
 
+    // @Param: FLUX_MIN
+    // @DisplayName: flux minimum
+    // @Description: Minimum flux expressed as ml/min
+    // @Units: %
+    // @Range: 0-6000
+    // @User: Standard
+    AP_GROUPINFO("FLUX_MIN",   5, AC_Sprayer, _flux_min, AC_SPRAYER_DEFAULT_FLUX_MIN),
+
+    // @Param: FLUX_MAX
+    // @DisplayName: flux max
+    // @Description: Max flux expressed as ml/min
+    // @Units: %
+    // @Range: 0-6000
+    // @User: Standard
+    AP_GROUPINFO("FLUX_MAX",   6, AC_Sprayer, _flux_max, AC_SPRAYER_DEFAULT_FLUX_MAX),
+
     AP_GROUPEND
 };
 
@@ -81,30 +98,58 @@ void AC_Sprayer::init()
     _triggle_manual = false;
     _triggle_tankempty = false;
     _flags.levelsensor_hasliq = false;
-
+#if HAL_WITH_UAVCAN
+    _manual_flux = 0;
+    //we set speed range from 100 to 800cm/s flux range from _flux_min to _flux_max which is depended on sprayer type
+    _rate_spd_to_flux = (_flux_max - _flux_min)/700.0f;
+    set_agr(0.0f, 0.0f, 0);
+#else
     _pump_manual_pct = 50;
-    _pump_grdspd_rate = (100.0f -AC_SPRAYER_DEFAULT_PUMP_MIN)/(500.0f - 100.0f);
-
+    _rate_spd_to_pumpct = (100.0f -AC_SPRAYER_DEFAULT_PUMP_MIN)/(500.0f - 100.0f);
     SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_pump, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
     SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_spinner, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+#endif
+
 
     _flags.inited = true;
 }
 
-//set max flight ground speed for auto spraying.
-void AC_Sprayer::set_max_ground_speed(int16_t speed_cms)
+#if HAL_WITH_UAVCAN
+//set target flux and target flight speed at which flux reach the target set by user for accurate dose
+bool AC_Sprayer::set_target_flux_speed(int16_t flux, int16_t speed_cms)
+{
+    if(flux<_flux_min || flux>_flux_max) return false;
+    // TODO: we need to know the max flight speed to limit the spray speed target
+    if(speed_cms<_speed_min || speed_cms > 800) return false;
+
+    if(flux==_flux_min){
+        _rate_spd_to_flux = 0.0f;
+        return true;
+    }
+    if(is_equal(speed_cms, _speed_min)){
+        //we set a very large value to insure the result pump pct to reach its max
+        _rate_spd_to_flux = 10000.0f;
+        return true;
+    }
+    _rate_spd_to_flux = (flux - _flux_min)*1.0f/(speed_cms - _speed_min);
+    return true;
+}
+#else
+//set flight ground speed at which pump percentatge reach its max for auto speed following spraying.
+void AC_Sprayer::set_max_pump_pct_gndspeed(int16_t speed_cms)
 {
     if(speed_cms<=_speed_min){
-        _pump_grdspd_rate = 100.0f;
+        //we set a very large value to insure the result pump pct to reach its max
+        _rate_spd_to_pumpct = 100.0f;
         return ;
     //as for agr vehicles, we default limit max speed no more than 10m/s
     }else if(speed_cms>1000.0f){
         speed_cms = 1000.0f;
     }
     //update ratio from ground speed to pump rate
-    _pump_grdspd_rate = (100.0f -AC_SPRAYER_DEFAULT_PUMP_MIN)/(speed_cms - 100.0f);
+    _rate_spd_to_pumpct = (100.0f -AC_SPRAYER_DEFAULT_PUMP_MIN)/(speed_cms - 100.0f);    
 }
-
+#endif
 
 //it will be inited by aux init
 void AC_Sprayer::handle_cmd_manual(const bool true_false)
@@ -175,9 +220,10 @@ void AC_Sprayer::change_pump_speed(const int8_t flag_val)
 }
 void AC_Sprayer::stop_spraying()
 {
+    set_agr(0.0f, 0.0f, 0);
     SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_pump, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
-    SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_spinner, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
     _flags.spraying = false;
+    _flux_dbg = 0;
 }
 
 /// update - adjust pwm of servo controlling pump speed according to the desired quantity and our horizontal speed
@@ -241,15 +287,19 @@ void AC_Sprayer::update()
 
     //
     update_pump_controller();
+    gcs().send_text(MAV_SEVERITY_INFO, "flux: %d", _flux_dbg);
 }
 
 /// update - adjust pwm of servo controlling pump speed according to the desired quantity and our horizontal speed
 void AC_Sprayer::update_pump_controller()
 {
+
+#if !HAL_WITH_UAVCAN
     // exit immediately if the pump function has not been set-up for any servo
     if (!SRV_Channels::function_assigned(SRV_Channel::k_sprayer_pump)) {
         return;
     }
+#endif
 
     // exit immediately if we are disabled or shouldn't be running
     if (_state!=Running) {
@@ -313,11 +363,38 @@ void AC_Sprayer::update_pump_controller()
     }
 
     // if spraying or testing update the pump servo
-    if (should_be_spraying) {
+    if (should_be_spraying){
+#if HAL_WITH_UAVCAN
+        int16_t flux =  _flux_min;
+        if(_pump_mode==Auto){
+            if(ground_speed > _speed_min){
+                flux = _flux_min + (ground_speed - _speed_min) * _rate_spd_to_flux;
+            }
+
+        }else if(_pump_mode==Calibr){
+            flux = _flux_max;
+        }else if(_pump_mode==Manual){
+            if(_ch_pumpspeedchg_flg==1){
+                _manual_flux += 500;
+            }else if(_ch_pumpspeedchg_flg==-1){
+                _manual_flux -= 500;
+            }
+            _manual_flux = MAX(_manual_flux, 0);
+            _manual_flux = MIN(_manual_flux,_flux_max);
+            flux = _flux_min + _manual_flux;
+        }
+        else flux = _flux_min;
+        flux = MAX(flux, _flux_min);    // ensure min flux
+        flux = MIN(flux,_flux_max);     //
+
+        //set target flux to agr module
+        set_agr(0, flux, 0);
+        _flux_dbg = flux;
+#else
         int8_t percent = _pump_min_pct;
         if(_pump_mode==Auto){
             if(ground_speed > _speed_min){
-                percent = _pump_min_pct + (ground_speed -_speed_min)  * _pump_grdspd_rate;
+                percent = _pump_min_pct + (ground_speed -_speed_min)  * _rate_spd_to_pumpct;
             }else{
                 percent = _pump_min_pct;
             }
@@ -342,7 +419,7 @@ void AC_Sprayer::update_pump_controller()
         constrain_int16(pump_pwm,AC_SPRAYER_DEFAULT_PUMP_STOP_PWM, AC_SPRAYER_DEFAULT_PUMP_MAX_PWM);
 
         SRV_Channels::set_output_pwm(SRV_Channel::k_sprayer_pump, pump_pwm);
-//        SRV_Channels::set_output_pwm(SRV_Channel::k_sprayer_spinner, _spinner_pwm);
+#endif
         _flags.spraying = true;
     } else {
         stop_spraying();
