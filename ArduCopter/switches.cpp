@@ -764,12 +764,22 @@ void Copter::do_aux_switch_function(int8_t ch_function, uint8_t ch_flag)
             }
             switch (ch_flag) {
                 case AUX_SWITCH_LOW:
-                    copter.mode_abzz.sample_ab_point(0,copter.current_loc);
+                    if(copter.mode_abzz.sample_ab_point(0,copter.current_loc)){
+                        copter.beaconParams.aPointLatitude = copter.current_loc.lat;
+                        copter.beaconParams.aPointLongitude = copter.current_loc.lng;
+                        gcs().send_message(MSG_BEACON_A_POINT);
+                    }
                     break;
+
                 case AUX_SWITCH_MIDDLE:
                     break;
+
                 case AUX_SWITCH_HIGH:
-                    copter.mode_abzz.sample_ab_point(1,copter.current_loc);
+                    if(copter.mode_abzz.sample_ab_point(1,copter.current_loc)){
+                        copter.beaconParams.bPointLatitude = copter.current_loc.lat;
+                        copter.beaconParams.bPointLongitude = copter.current_loc.lng;
+                        gcs().send_message(MSG_BEACON_B_POINT);
+                    }
                     break;
             }
         }
