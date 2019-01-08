@@ -39,6 +39,10 @@ bool Copter::ModeABZz::init(bool ignore_checks)
             case SEL_SHIFT_DIR:
                 gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need shift direction.");
                 break;
+            case GET_AB_BEAR_REV:
+                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need bear rev to recover.");
+                break;
+
             default:
                 break;
             }
@@ -59,6 +63,10 @@ bool Copter::ModeABZz::init(bool ignore_checks)
         _sta_abzz = Start;
         _sta_abzz_last = Start;
     }
+
+    //we need to set _flags.save_when_exit to false every time we begin abzzmode
+    //it will enable work status being saved when exit abzz mode in unexpected situation.
+    _flags.save_when_exit = true;
 
     //calculate yaw
     if(!_flags.ab_bearing_set){
@@ -135,8 +143,6 @@ void Copter::ModeABZz::run_autopilot()
     update_work_speed();
 }
 
-
-
 void Copter::ModeABZz::update_abwp_sta()
 {
     bool wp_complete = false;
@@ -152,45 +158,30 @@ void Copter::ModeABZz::update_abwp_sta()
 
             //
             if(!generate_next_abline()){
-                exit_ab_mode(true);
+                brake_and_exit(false);
                 _sta_abzz = StandBy;
                 _sta_abzz_last = Start;
                 return ;
             }
 
-            //update loiter timer with destination distance
-            Vector2f curr_vect_h;
-            if(!copter.current_loc.get_vector_xy_from_origin_NE(curr_vect_h)){
-                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: current position error.");
-                exit_ab_mode(false);
-                _sta_abzz = StandBy;
-                _sta_abzz_last = Start;
-                return;
-            }
-            Vector2f vect = Vector2f(_point_shift_a.x, _point_shift_a.y);
-               vect -= curr_vect_h;
-            float tag_distance = vect.length();
-            if(tag_distance< ABZZ_WP_RADIUS_CM){
-                loiter_time_max = 2;
-            }
-            else{
-                loiter_time_max = 1;
-            }
-            loiter_time = 0;
-
-            //if far enuogh we need vehicle's head look to the taget point
-            //to make sure forward direction is under radar detect range
-            if(tag_distance>ABZZ_YAW_LOOK_DISTANCE_MIN_CM){
-                auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
-            }else{
-                auto_yaw.set_fixed_yaw(_ab_bearing_deg, 20.0f, 0, false);
-            }
-
             if (wp_start(_point_shift_a)){
+                //update loiter timer with destination distance
+                if(wp_distance()< ABZZ_WP_RADIUS_CM){
+                    loiter_time_max = 2;
+                }
+                else{
+                    loiter_time_max = 1;
+                }
+                loiter_time = 0;
+
+                //update yaw
+                auto_yaw.set_fixed_yaw(wp_bearing()/100.0f, 20.0f, 0, false);
+                
                 _sta_abzz = GotoWork;
+                _mode = Abzz_WP;
             }else{
                 gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
-                exit_ab_mode(false);
+                brake_and_exit(true);
                 _sta_abzz = StandBy;
             }
             _sta_abzz_last = Start;
@@ -198,44 +189,25 @@ void Copter::ModeABZz::update_abwp_sta()
         break;
 
     case Resume:{
-             //update loiter timer with destination distance
-             Vector2f curr_vect_h;
-             if(!copter.current_loc.get_vector_xy_from_origin_NE(curr_vect_h)){
-                 gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: ekf_origin failed.");
-                 exit_ab_mode(false);
-                _sta_abzz = StandBy;
-                _sta_abzz_last = Resume;
-                 return;
-             }
-             Vector2f vect;
-             if(!_point_break.get_vector_xy_from_origin_NE(vect)){
-                 gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: ekf_origin failed.");
-                 exit_ab_mode(false);
-                _sta_abzz = StandBy;
-                _sta_abzz_last = Resume;
-                 return;
-             }
-             vect -= curr_vect_h;
-             if(vect.length() < ABZZ_WP_RADIUS_CM){
-                 loiter_time_max = 2;
-             }
-             else{
-                 loiter_time_max = 1;
-             }
-             loiter_time = 0;
-
-             auto_yaw.set_mode(AUTO_YAW_LOOK_AT_NEXT_WP);
-
-            // initialise waypoint and spline controller
-//            wp_nav->wp_and_spline_init();
-
             //set start point to last break point
             if (wp_start(_point_break)){
+                //update loiter timer with destination distance
+                if(wp_distance()< ABZZ_WP_RADIUS_CM){
+                    loiter_time_max = 2;
+                }
+                else{
+                    loiter_time_max = 1;
+                }
+                loiter_time = 0;
+
+                //update yaw
+                auto_yaw.set_fixed_yaw(wp_bearing()/100.0f, 20.0f, 0, false);
+
                 _sta_abzz = GotoWork;
                 _mode = Abzz_WP;
             }else{
                 gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
-                exit_ab_mode(false);
+                brake_and_exit(true);
                 _sta_abzz = StandBy;
             }
             gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: Resume.");
@@ -245,34 +217,25 @@ void Copter::ModeABZz::update_abwp_sta()
 
     case GotoWork:
          if(verify_nav_wp()){
-             //update loiter timer with destination distance
-             Vector2f curr_vect_h;
-             if(!copter.current_loc.get_vector_xy_from_origin_NE(curr_vect_h)){
-                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: current position error.");
-                exit_ab_mode(false);
-                _sta_abzz = StandBy;
-                _sta_abzz_last = GotoWork;
-                 return;
-             }
-             Vector2f vect = Vector2f(_point_shift_b.x, _point_shift_b.y);
-             vect -= curr_vect_h;
-            if(vect.length() < ABZZ_WP_RADIUS_CM){
-                loiter_time_max = 2;
-            }
-            else{
-                loiter_time_max = 1;
-            }
-            loiter_time = 0;
-            //set fixed sepcific yaw angle according to way point direction
-            auto_yaw.set_fixed_yaw(_ab_bearing_deg, 20.0f, 0, false);
-
             if(set_next_wp(_point_shift_b)){
+                //update loiter timer with destination distance
+                if(wp_distance()< ABZZ_WP_RADIUS_CM){
+                    loiter_time_max = 2;
+                }
+                else{
+                    loiter_time_max = 1;
+                }
+                loiter_time = 0;
+
+                //update yaw
+                auto_yaw.set_fixed_yaw(_ab_bearing_deg/100.0f, 20.0f, 0, false);
+
                 _sta_abzz = AToB;
                 //enable sprayer
                 operate_sprayer(true);
             }else{
                 gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
-                exit_ab_mode(false);
+                brake_and_exit(true);
                 _sta_abzz = StandBy;
             }
             _sta_abzz_last = GotoWork;
@@ -294,7 +257,7 @@ void Copter::ModeABZz::update_abwp_sta()
             gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: AtoB finish");
             
             if(!generate_next_abline()){
-                exit_ab_mode(true);
+                brake_and_exit(false);
                 _sta_abzz = StandBy;
                 _sta_abzz_last = AToB;
                 return ;
@@ -309,10 +272,9 @@ void Copter::ModeABZz::update_abwp_sta()
                 _sta_abzz = BToA;
                 //enable sprayer
                 operate_sprayer(false);
-//                gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: AToB set_next_wp");
             }else{
                 gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
-                exit_ab_mode(false);
+                brake_and_exit(true);
                 _sta_abzz = StandBy;
             }
             _sta_abzz_last = AToB;
@@ -342,10 +304,9 @@ void Copter::ModeABZz::update_abwp_sta()
                 _sta_abzz = AToB;
                 //enable sprayer
                 operate_sprayer(false);
-//                gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: BToA set_next_wp");
             }else{
                 gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
-                exit_ab_mode(false);
+                brake_and_exit(true);
                 _sta_abzz = StandBy;
             }
             _sta_abzz_last = BToA;
@@ -365,20 +326,20 @@ void Copter::ModeABZz::update_abwp_sta()
 //        copter.wp_nav->set_speed_xy(section);
 //----------------------------------
         //change speed
-        int16_t ch_spd = channel_speed->get_control_in();
-        int16_t section;
-        if(ch_spd<250){
-            section = 100;
-        }else if(ch_spd>=250 && ch_spd <480){
-            section = 300;
-        }else if(ch_spd>=480 && ch_spd <750){
-            section = 500;
-        }else if(ch_spd>=750){
-            section = 800;
-        }
-        if(section!=_pilot_desired_speed_cms){
-            _pilot_desired_speed_cms = section;
-        }
+//        int16_t ch_spd = channel_speed->get_control_in();
+//        int16_t section;
+//        if(ch_spd<250){
+//            section = 100;
+//        }else if(ch_spd>=250 && ch_spd <480){
+//            section = 300;
+//        }else if(ch_spd>=480 && ch_spd <750){
+//            section = 500;
+//        }else if(ch_spd>=750){
+//            section = 800;
+//        }
+//        if(section!=_pilot_desired_speed_cms){
+//            _pilot_desired_speed_cms = section;
+//        }
 
 //----------------------------------
 
@@ -392,50 +353,133 @@ void Copter::ModeABZz::record_breakpoint()
     if(_sta_abzz == AToB){
         _point_break = copter.current_loc;
     }else if(_sta_abzz == BToA){
-        _point_break = _point_shift_a;
+        Location_Class temp_loc(_point_shift_a);
+        _point_break = temp_loc;
     }
 
     gcs().send_text(MAV_SEVERITY_INFO, "ABZz: break_point recorded");
 }
 
+void Copter::ModeABZz::set_breakpoint(Location_Class& brk_point)
+{
+    _point_break = brk_point;
+}
+
+//exit from normal work flow, we need to save the work info
+void Copter::ModeABZz::record_workinfo_for_beacon_msg()
+{
+    copter.beaconParams.breakPointLongitude = _point_break.lng;
+    copter.beaconParams.breakPointLatitude = _point_break.lat;
+    
+    if(_point_shift_a.is_zero() || _point_shift_b.is_zero()){
+        copter.beaconParams.aPointLongitude = _point_a.lng;
+        copter.beaconParams.aPointLatitude = _point_a.lat;
+        copter.beaconParams.bPointLongitude = _point_b.lng;
+        copter.beaconParams.bPointLatitude = _point_b.lat;
+    }else{
+        Location_Class temp_loc(_point_shift_a);
+        copter.beaconParams.aPointLongitude = temp_loc.lng;
+        copter.beaconParams.aPointLatitude = temp_loc.lat;
+        Location_Class temp_loc2(_point_shift_b);
+        copter.beaconParams.bPointLongitude = temp_loc2.lng;
+        copter.beaconParams.bPointLatitude = temp_loc2.lat;
+    }
+
+    if(_flags.ab_bearing_reverse)
+        copter.beaconParams.breakDirection = 1;
+    else copter.beaconParams.breakDirection = 0;
+}
+
+void Copter::ModeABZz::send_beacon_msg()
+{
+    gcs().send_message(MSG_BEACON_A_POINT);
+    gcs().send_message(MSG_BEACON_B_POINT);
+    gcs().send_message(MSG_BEACON_BREAKPOINT);
+}
 
 bool Copter::ModeABZz::handle_RC_exit_ab_mode()
 {
     // any roll or pitch stick action will cause suspend
     if(channel_pitch->get_control_in() > 100 ||channel_pitch->get_control_in() < -100
         ||channel_roll->get_control_in() > 100 ||channel_roll->get_control_in() < -100){
-        if(exit_ab_mode(false)) return true;
+        if(brake_and_exit(true)) return true;
         else return false;
     }
     return false;
 }
 
 //
-bool Copter::ModeABZz::exit_ab_mode(bool end_mission)
+void Copter::ModeABZz::exit_ab_mode()
 {
-    //if we don't end mission we must run record_breakpoint
-    if(end_mission){
+    //if we don't end mission we must run record_workinfo and break point
+    if(!_flags.save_when_exit){
         reset_mission();
     }else{
+        //record break point
         record_breakpoint();
+        //update ab info
+        if(!update_ab_status_to_current(UPDATE_AB_REASON_BREAK)){
+            gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: update ab point failed when exit.");
+        }
+        //fill the work information to beacon message
+        record_workinfo_for_beacon_msg();
+        send_beacon_msg();
     }
-    
-    if (copter.set_mode(LOITER, MODE_REASON_UNKNOWN)) {
-        copter.mode_brake.timeout_to_loiter_ms(1500);
+    set_sprayer_manual();
+}
+
+bool Copter::ModeABZz::brake_and_exit(bool save_sta)
+{
+    //tell exit processor if we need to save work status
+    _flags.save_when_exit = save_sta;
+
+    if (copter.set_mode(BRAKE, MODE_REASON_UNKNOWN)) {
+        copter.mode_brake.timeout_to_loiter_ms(500);
         return true;
     }else return false;
-
-    set_sprayer_manual();
 }
 
 bool Copter::ModeABZz::check_ab_point_validity()
 {
+    float dist_limit_m;
+#if AC_FENCE == ENABLED
+    dist_limit_m = copter.fence.get_radius();
+#else
+    //we limit the distance in 2000m as default
+    dist_limit_m = 2000.0f;
+#endif
+    Location_Class home(ahrs.get_home());
+    if(_point_a.get_distance(home) > dist_limit_m || _point_b.get_distance(home) > dist_limit_m){
+        gcs().send_text(MAV_SEVERITY_ERROR, "ABZz: A / B point location is exceed distance limit");
+        return false;
+    }
     return true;
 }
 
 bool Copter::ModeABZz::check_break_point_validity()
 {
+    float dist_limit_m;
+#if AC_FENCE == ENABLED
+    dist_limit_m = copter.fence.get_radius();
+#else
+    //we limit the distance in 2000m as default
+    dist_limit_m = 2000.0f;
+#endif
+
     if(!_point_break.is_zero()){
+        Location_Class home(ahrs.get_home());
+        float dist_brk2a = _point_break.get_distance(_point_a);
+        float dist_brk2b = _point_break.get_distance(_point_b);
+        float dist_a2b    = _point_a.get_distance(_point_b);
+
+        //we give 10m and 20m as margin to judge if break point is unreasonable
+        if(dist_brk2a + dist_brk2b >  dist_a2b+10.0f && dist_brk2a > 20.0f && dist_brk2b > 20.0f){
+            gcs().send_text(MAV_SEVERITY_ERROR, "ABZz: break point location is unreasonable");
+            return false;
+        }else if(_point_break.get_distance(home) > dist_limit_m){
+            gcs().send_text(MAV_SEVERITY_ERROR, "ABZz: break point location is exceed distance limit");
+            return false;
+        }
         return true;
     }
     else{
@@ -450,7 +494,7 @@ bool Copter::ModeABZz::clear_ab_point()
     return true;
 }
 
-bool Copter::ModeABZz::update_ab_point(Location_Class &loc_to_a, Location_Class &loc_to_b, uint8_t reason, uint8_t update_mask)
+bool Copter::ModeABZz::set_ab_point(Location_Class &loc_to_a, Location_Class &loc_to_b, uint8_t reason, uint8_t update_mask)
 {
     //someone is using ab data
     if(_mutex_ab_param) return false;
@@ -467,17 +511,40 @@ bool Copter::ModeABZz::update_ab_point(Location_Class &loc_to_a, Location_Class 
         _sta_absetting = SEL_SHIFT_DIR;
     }
 
-    if(reason == UPDATE_AB_REASON_CHGWD){
+    if(reason == UPDATE_AB_REASON_CHGWD || reason == UPDATE_AB_REASON_BREAK){
         _sta_absetting = AB_POINT_CMPLT;
+
+    //for recover purpose we also need to get ab point bearing reverse flag
+    }else if(reason == UPDATE_AB_REASON_GCSSET){
+        _sta_absetting = GET_AB_BEAR_REV;
     }
 
     //reset shift count
     _shift_count = 0;
 
-    gcs().send_text(MAV_SEVERITY_INFO, "new A:=%d, B=%d, cnt=%d", _point_a.lng,_point_b.lng, _shift_count);
+    gcs().send_text(MAV_SEVERITY_DEBUG, "new A:=%d, B=%d, cnt=%d", _point_a.lng,_point_b.lng, _shift_count);
     //release mutex
     _mutex_ab_param = false;
 
+    return true;
+}
+
+//update ab status to current work status, including ab point, ab bearing reverse flag and shift count.
+bool Copter::ModeABZz::update_ab_status_to_current(ABUpdate_Reason_eu reason)
+{
+    if(_mutex_ab_param) return false;
+
+    //means we are working in AB mode or be paused from the mode
+    if(_sta_absetting == AB_POINT_CMPLT && _shift_count!=0){
+        Location_Class curr_a(_point_shift_a);
+        Location_Class curr_b(_point_shift_b);
+        if(!set_ab_point(curr_a, curr_b, reason, 3)) return false;
+        if(_shift_count%2!=0){
+             //if we reverse the AB shift point to BA, use flag to mark this exhange.
+             //_flag.ab_bearing_reverse is used to track the original sample AB point.
+            _flags.ab_bearing_reverse  = !_flags.ab_bearing_reverse;
+        }
+    }
     return true;
 }
 
@@ -519,7 +586,7 @@ bool Copter::ModeABZz::save_ab_shiftdir(int8_t direction)
         if(_shift_direction_cw>0){
             gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: shift right");
         }else{
-            gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need shift direction");
+            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: shift left");
         }
         return true;
     }
@@ -541,11 +608,32 @@ void Copter::ModeABZz::save_ab_shiftdir_RC()
         }
     }
 }
+/*
+void Copter::ModeABZz::recover_ab_base_info(BeaconParams& param)
+{
+    //fill ab location info
+    Location_Class loc_a(param.aPointLatitude, param.aPointLongitude, param.height, ALT_FRAME_ABOVE_TERRAIN);
+    Location_Class loc_b(param.bPointLatitude, param.bPointLongitude, param.height, ALT_FRAME_ABOVE_TERRAIN);
+    copter.mode_abzz.set_ab_point(loc_a, loc_b, UPDATE_AB_REASON_GCSSET, 3);
 
+    _flags.ab_bearing_set = false;
+}
+*/
+void Copter::ModeABZz::set_ab_bearing_reverse_flag(uint8_t flag)
+{
+    if(flag) 
+        _flags.ab_bearing_reverse = true;
+    else _flags.ab_bearing_reverse = false;
+}
+
+bool Copter::ModeABZz::get_ab_bearing_reverse_flag()
+{
+    return _flags.ab_bearing_reverse;
+}
 
 void Copter::ModeABZz::calc_ab_bearing()
 {
-    if(_flags.ab_brearing_reverse){
+    if(_flags.ab_bearing_reverse){
         _ab_bearing_deg = get_bearing_cd(_point_b, _point_a)/100.0f;
     }else{
         _ab_bearing_deg = get_bearing_cd(_point_a, _point_b)/100.0f;
@@ -557,33 +645,24 @@ void Copter::ModeABZz::calc_ab_bearing()
 //
 bool Copter::ModeABZz::change_shiftwidth(uint16_t new_width_cm)
 {
-
-    if(_mutex_ab_param) return false;
-
-    //means we are working in AB mode or be paused from the mode
-    if(_sta_absetting == AB_POINT_CMPLT && _shift_count!=0){
-        Location_Class curr_a(_point_shift_a);
-        Location_Class curr_b(_point_shift_b);
-        if(!update_ab_point(curr_a, curr_b, UPDATE_AB_REASON_CHGWD, 3)) return false;
-        if(_shift_count%2!=0){
-             //if we reverse the AB shift point to BA, use flag to mark this exhange.
-             //_flag.ab_brearing_reverse is used to track the original sample AB point.
-            _flags.ab_brearing_reverse  = !_flags.ab_brearing_reverse;
-        }
+    if(update_ab_status_to_current(UPDATE_AB_REASON_CHGWD)){
+        //update shift width parameter
+        _shift_width_cm = new_width_cm;
+         gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: set shift width: %d cm", _shift_width_cm);
+        return true;
+    }else{
+        gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ:change width failed");
+        return false;
     }
-
-    //update shift width parameter
-    _shift_width_cm = new_width_cm;
-
-    return true;
 }
 
 void Copter::ModeABZz::set_ab_desired_terrain_alt(uint16_t desired_alt_cm)
 {
     if(150>desired_alt_cm) desired_alt_cm = 150;
     else if(600<desired_alt_cm) desired_alt_cm = 600;
-        
+
     copter.wp_nav->set_wp_desired_terrain_alt(desired_alt_cm);
+    gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: set terrain alt: %d cm", desired_alt_cm);
 }
 
 bool Copter::ModeABZz::generate_next_abline()
@@ -657,7 +736,7 @@ bool Copter::ModeABZz::generate_abline(uint16_t shift_cnt)
 
 bool Copter::ModeABZz::set_work_speed(const uint16_t speed)
 {
-    if(speed > WPNAV_WP_SPEED_MIN && speed < 1000){
+    if(speed >=WPNAV_WP_SPEED_MIN && speed <= 1000){
         _pilot_desired_speed_cms = speed;
         return true;
     }else return false;
@@ -668,7 +747,7 @@ void Copter::ModeABZz::update_work_speed()
     bool val_change=false;
     //slow down speed limit change when speed limit decrease
     int16_t speed_limit_err = _pilot_desired_speed_cms - _maxspeed_cms;
-    
+
     if(speed_limit_err < -5){
         _maxspeed_cms -= 5;
         val_change = true;
@@ -676,7 +755,7 @@ void Copter::ModeABZz::update_work_speed()
         _maxspeed_cms += speed_limit_err;
         val_change = true;
     }
-    
+
     if(val_change){
         copter.wp_nav->set_speed_xy(_maxspeed_cms);
     }
@@ -690,7 +769,7 @@ void Copter::ModeABZz::start_mission()
     _point_shift_a.zero();
     _shift_count = 0;
     _flags.ab_bearing_set = false;
-    _flags.ab_brearing_reverse = false;
+    _flags.ab_bearing_reverse = false;
 }
 
 //reset necessary mission data
@@ -707,14 +786,14 @@ void Copter::ModeABZz::reset_mission()
     _shift_direction_cw = 1;
     _shift_count = 0;
     _flags.ab_bearing_set = false;
-    _flags.ab_brearing_reverse = false;
+    _flags.ab_bearing_reverse = false;
 }
 
 // auto_wp_start - initialises waypoint controller to implement flying to a particular destination
 bool Copter::ModeABZz::wp_start(Vector3f& dest_vect)
 {
 
-    copter.wp_nav->set_speed_xy(200);
+    copter.wp_nav->set_speed_xy(_pilot_desired_speed_cms);
 
     // send target to waypoint controller
     if (!set_next_wp(dest_vect)) {
@@ -730,7 +809,7 @@ bool Copter::ModeABZz::wp_start(Vector3f& dest_vect)
 bool Copter::ModeABZz::wp_start(const Location_Class& dest_loc)
 {
 
-    copter.wp_nav->set_speed_xy(200);
+    copter.wp_nav->set_speed_xy(_pilot_desired_speed_cms);
 
     //convert to vector with x,y from ekf_origin and alt above ground if terrain is enable,
     //if not, the vector is from ekf_origin
@@ -1144,5 +1223,35 @@ void Copter::ModeABZz::set_sprayer_manual()
 //        return false;
 //    }
 //}
+
+void Copter::ModeABZz::handle_set_pecial_point_Info(uint8_t info_type, BeaconParams& param)
+{
+    if(copter.flightmode == &copter.mode_loiter){
+        switch(info_type){
+            case 1:{
+                Location_Class loc_break(param.aPointLatitude, param.aPointLongitude, param.height, Location_Class::ALT_FRAME_ABOVE_TERRAIN);
+                copter.mode_abzz.set_breakpoint(loc_break);
+                copter.mode_abzz.set_ab_bearing_reverse_flag(copter.beaconParams.breakDirection);
+                gcs().send_text(MAV_SEVERITY_DEBUG, "set break point.");
+            }break;
+
+            case 2:{
+                Location_Class loc_a(param.aPointLatitude, param.aPointLongitude, param.height, Location_Class::ALT_FRAME_ABOVE_TERRAIN);
+                Location_Class loc_b;
+                copter.mode_abzz.set_ab_point(loc_a, loc_b, UPDATE_AB_REASON_GCSSET, 0x01);
+                gcs().send_text(MAV_SEVERITY_DEBUG, "set a point.");
+            }break;
+
+            case 3:{
+                Location_Class loc_b(param.aPointLatitude, param.aPointLongitude, param.height, Location_Class::ALT_FRAME_ABOVE_TERRAIN);
+                Location_Class loc_a;
+                copter.mode_abzz.set_ab_point(loc_a, loc_b, UPDATE_AB_REASON_GCSSET, 0x02);
+                gcs().send_text(MAV_SEVERITY_DEBUG, "set b point.");
+            }break;
+
+            default:break;
+        }
+    }
+}
 
 #endif

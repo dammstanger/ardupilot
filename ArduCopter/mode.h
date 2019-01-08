@@ -268,14 +268,13 @@ public:
 
     typedef enum{
         UPDATE_AB_REASON_CHGWD,
-        UPDATE_AB_REASON_GCSCMD
+        UPDATE_AB_REASON_BREAK,
+        UPDATE_AB_REASON_GCSSET
     }ABUpdate_Reason_eu;
 
 
     ModeABZz(void):
-//        _point_a(Location_Class(225746990,1144842990, 500, Location_Class::ALT_FRAME_ABOVE_HOME)),
-//        _point_b(Location_Class(225749380,1144841840, 500, Location_Class::ALT_FRAME_ABOVE_HOME)),
-        _shift_width_cm(180)
+        _shift_width_cm(200)
         {}
     bool init(bool ignore_checks) override;
     void run() override;
@@ -288,15 +287,23 @@ public:
     // Abzz
     //    AbzzMode mode() const { return _mode; }
     void update_abwp_sta();
-    bool update_ab_point(Location_Class &loc_to_a, Location_Class &loc_to_b, uint8_t reason, uint8_t update_mask);
+    void set_breakpoint(Location_Class& brk_point);
+    bool set_ab_point(Location_Class &loc_to_a, Location_Class &loc_to_b, uint8_t reason, uint8_t update_mask);
     bool sample_ab_point(uint8_t get_b, Location_Class& loc);
     bool clear_ab_point();
     bool change_shiftwidth(uint16_t new_width_cm);
     bool save_ab_shiftdir(int8_t direction);
     void save_ab_shiftdir_RC();
     void set_ab_desired_terrain_alt(uint16_t desired_alt_cm);
-    bool exit_ab_mode(bool end_mission);
+    bool set_work_speed(const uint16_t speed);
+    void set_ab_bearing_reverse_flag(uint8_t flag);
+    bool get_ab_bearing_reverse_flag();
+
+//    void recover_ab_base_info(BeaconParams& param);
+    bool brake_and_exit(bool save_sta);
+    void exit_ab_mode();
     bool handle_RC_exit_ab_mode();
+    void handle_set_pecial_point_Info(uint8_t info_type, BeaconParams& param);
 
     void start_mission();
     void reset_mission();
@@ -330,12 +337,15 @@ private:
     bool check_ab_point_validity();
     bool check_break_point_validity();
     void calc_ab_bearing();
+    bool update_ab_status_to_current(ABUpdate_Reason_eu reason);
     bool generate_next_abline();
     bool generate_abline(uint16_t shift_cnt);
     void record_breakpoint();
+    void record_workinfo_for_beacon_msg();
+    void send_beacon_msg();
     bool set_next_wp(Vector3f& dest_vect);
-    bool set_work_speed(const uint16_t speed);
     void update_work_speed();
+
     void set_sprayer_auto();
     void set_sprayer_manual();
     void operate_sprayer(const bool enable);
@@ -356,6 +366,7 @@ private:
         SAMPLE_A=0,
         SAMPLE_B,
         SEL_SHIFT_DIR,
+        GET_AB_BEAR_REV,
         AB_POINT_CMPLT
     }ABsample_sta_eu;
 
@@ -370,8 +381,9 @@ private:
 
     struct{
         uint8_t ab_bearing_set:1;               //true if the bearing of ab point is set
-        uint8_t ab_brearing_reverse:1;      //true if A and B point is reverse from the origin sampled
+        uint8_t ab_bearing_reverse:1;      //true if A and B point is reverse from the origin sampled
         uint8_t work_alt_update_throttle:1;
+        uint8_t save_when_exit:1;
     }_flags;
 
     //ab point parameter
@@ -379,12 +391,12 @@ private:
     Location_Class _point_a;                    //position with abs lat and lng , but alt is above EKF_origin in cm
     Location_Class _point_b;
     Location_Class _point_break;
-    AP_Int32 _point_a_lat;                          //lat in 10^-7
-    AP_Int32 _point_a_lng;                          //lng in 10^-7
-    AP_Int32 _point_b_lat;                          //lat in 10^-7
-    AP_Int32 _point_b_lng;                          //lng in 10^-7
-    AP_Int32 _point_break_lat;                          //lat in 10^-7
-    AP_Int32 _point_break_lng;                          //lng in 10^-7
+//    AP_Int32 _point_a_lat;                          //lat in 10^-7
+//    AP_Int32 _point_a_lng;                          //lng in 10^-7
+//    AP_Int32 _point_b_lat;                          //lat in 10^-7
+//    AP_Int32 _point_b_lng;                          //lng in 10^-7
+//    AP_Int32 _point_break_lat;                          //lat in 10^-7
+//    AP_Int32 _point_break_lng;                          //lng in 10^-7
     Vector3f _point_shift_a;                    //position vector related to EKF_origin in cm NEU
     Vector3f _point_shift_b;
     int32_t _terrain_cmd_alt_cm = 400;  //save command altitude from gcs
@@ -402,7 +414,7 @@ private:
 
     //work speed limit
     uint16_t _maxspeed_cms;
-    uint16_t _pilot_desired_speed_cms = 5;
+    uint16_t _pilot_desired_speed_cms = 500;
 
     // Loiter control
     uint16_t loiter_time_max;                // How long we should stay in Loiter Mode for mission scripting (time in seconds)

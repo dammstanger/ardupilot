@@ -367,10 +367,14 @@ bool GCS_MAVLINK_Copter::try_send_message(enum ap_message id)
         copter.adsb.send_adsb_vehicle(chan);
 #endif
         break;
-	case MSG_BEACON_BREAKPOINT:
-		mavlink_msg_special_point_info_send(chan, 1, 8, copter.beaconParams.seqOfNextWayPoint, copter.beaconParams.breakPointLatitude, copter.beaconParams.breakPointLongitude);
+	case MSG_BEACON_BREAKPOINT:{
+        bool revflag = false;
+#if MODE_ABZZ_ENABLED == ENABLED
+        revflag = copter.mode_abzz.get_ab_bearing_reverse_flag();
+#endif
+		mavlink_msg_special_point_info_send(chan, 1, revflag, copter.beaconParams.seqOfNextWayPoint, copter.beaconParams.breakPointLatitude, copter.beaconParams.breakPointLongitude);
 		gcs().send_text(MAV_SEVERITY_CRITICAL, "send beacon breakpoint --------\n\r"); 
-		break;
+		}break;
 	case MSG_BEACON_COMPLETE:
 		mavlink_msg_command_long_send(
             chan,
@@ -382,6 +386,20 @@ bool GCS_MAVLINK_Copter::try_send_message(enum ap_message id)
             0, 0, 0, 0, 0, 0);
 		gcs().send_text(MAV_SEVERITY_CRITICAL, "beacon complete work send (cmd)\n\r"); 
 		break;
+
+    case MSG_BEACON_A_POINT:
+#if MODE_ABZZ_ENABLED == ENABLED
+        mavlink_msg_special_point_info_send(chan, 2, 0, 0, copter.beaconParams.aPointLatitude, copter.beaconParams.aPointLongitude);
+        gcs().send_text(MAV_SEVERITY_DEBUG, "beacon: send a point");
+#endif
+    break;
+
+    case MSG_BEACON_B_POINT:
+#if MODE_ABZZ_ENABLED == ENABLED
+        mavlink_msg_special_point_info_send(chan, 3, 0, 0, copter.beaconParams.bPointLatitude, copter.beaconParams.bPointLongitude);
+        gcs().send_text(MAV_SEVERITY_DEBUG, "beacon: send b point");
+#endif
+    break;
 
     default:
         return GCS_MAVLINK::try_send_message(id);
@@ -1865,24 +1883,28 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_get_point_ab(const mavlink_command
         }
 
         if(packet.command == MAV_CMD_GET_POINT_A){
-            copter.mode_abzz.sample_ab_point(0,copter.current_loc);
+            if(copter.mode_abzz.sample_ab_point(0,copter.current_loc)){
+                copter.beaconParams.aPointLatitude = copter.current_loc.lat;
+                copter.beaconParams.aPointLongitude = copter.current_loc.lng;
 
-			copter.beaconParams.aPointLatitude = copter.current_loc.lat;
-			copter.beaconParams.aPointLongitude = copter.current_loc.lng;
-
-			mavlink_msg_special_point_info_send(chan, 2, 0, 0, copter.beaconParams.aPointLatitude, copter.beaconParams.aPointLongitude);
+                mavlink_msg_special_point_info_send(chan, 2, 0, 0, copter.beaconParams.aPointLatitude, copter.beaconParams.aPointLongitude);
+            }else{
+                return MAV_RESULT_FAILED;
+            }
         }else{
-            copter.mode_abzz.sample_ab_point(1,copter.current_loc);
+            if(copter.mode_abzz.sample_ab_point(1,copter.current_loc)){
+                copter.beaconParams.bPointLatitude = copter.current_loc.lat;
+                copter.beaconParams.bPointLongitude = copter.current_loc.lng;
 
-			copter.beaconParams.bPointLatitude = copter.current_loc.lat;
-			copter.beaconParams.bPointLongitude = copter.current_loc.lng;
-
-			mavlink_msg_special_point_info_send(chan, 3, 0, 0, copter.beaconParams.bPointLatitude, copter.beaconParams.bPointLongitude);
+                mavlink_msg_special_point_info_send(chan, 3, 0, 0, copter.beaconParams.bPointLatitude, copter.beaconParams.bPointLongitude);
+            }else{
+                return MAV_RESULT_FAILED;
+            }
         }
 
         return MAV_RESULT_ACCEPTED;
     }else{
-        gcs().send_text(MAV_SEVERITY_ERROR, "Not in ab setting mode.");
+        gcs().send_text(MAV_SEVERITY_ERROR, "Not in ab setting mode");
         return MAV_RESULT_DENIED;
     }
 #else
@@ -1902,7 +1924,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_clear_point_ab()
             return MAV_RESULT_DENIED;                
         }
     }else{
-        gcs().send_text(MAV_SEVERITY_ERROR, "Not in ab setting mode.");
+        gcs().send_text(MAV_SEVERITY_ERROR, "Not in ab setting mode");
         return MAV_RESULT_DENIED;
     }
 #else
@@ -1939,12 +1961,13 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_pause_work()
     gcs().send_text(MAV_SEVERITY_DEBUG, "In handle pause work");
 
     if(copter.flightmode == &copter.mode_auto){
-		copter.set_mode(LOITER, MODE_REASON_GCS_COMMAND);
-        result = MAV_RESULT_ACCEPTED;
+        if(copter.set_mode(LOITER, MODE_REASON_GCS_COMMAND)){
+            result = MAV_RESULT_ACCEPTED;
+        }
 #if MODE_ABZZ_ENABLED == ENABLED
     }else if(copter.flightmode == &copter.mode_abzz){
-        //we only pause the mission keep the work status
-        if(copter.mode_abzz.exit_ab_mode(false)){
+        //we only pause the mission, keep the work status
+        if(copter.mode_abzz.brake_and_exit(true)){
             gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: exit by cmd");
             result = MAV_RESULT_ACCEPTED;
        }
@@ -1967,7 +1990,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_finish_work()
 #if MODE_ABZZ_ENABLED == ENABLED
     }else if(copter.flightmode == &copter.mode_abzz){
         //we only pause the mission keep the work status
-        if(copter.mode_abzz.exit_ab_mode(true)){
+        if(copter.mode_abzz.brake_and_exit(false)){
             result = MAV_RESULT_ACCEPTED;
         }
 #else
@@ -1990,11 +2013,12 @@ uint32_t GCS_MAVLINK_Copter::setBeaconParams()
 	copter.beaconParams.width = beaconParams.width;
 	copter.beaconParams.velocity = beaconParams.velocity;
 	copter.beaconParams.flow = beaconParams.flow;
-    
-        if(copter.flightmode == &copter.mode_abzz){    
-			copter.wp_nav->set_speed_xy(copter.beaconParams.velocity);
-            copter.mode_abzz.set_ab_desired_terrain_alt(copter.beaconParams.height);
+
+        if(copter.flightmode == &copter.mode_abzz || copter.flightmode == &copter.mode_loiter){
             copter.mode_abzz.save_ab_shiftdir(copter.beaconParams.width>0? 1 : -1);
+            copter.mode_abzz.set_work_speed(copter.beaconParams.velocity);
+            copter.mode_abzz.set_ab_desired_terrain_alt(copter.beaconParams.height);
+            copter.mode_abzz.change_shiftwidth(abs(copter.beaconParams.width));
         }
 
 	return 0;
@@ -2017,9 +2041,11 @@ uint32_t GCS_MAVLINK_Copter::setSpecialPointInfo(uint8_t type)
 		copter.beaconParams.breakPointType = type;
 	} else {
 		gcs().send_text(MAV_SEVERITY_CRITICAL, "Get error beacon special point: id %d\n\r", type);
+            return 1;
 	}
-
-	return 0;
+    //handle msg for abzz mode
+    copter.mode_abzz.handle_set_pecial_point_Info(type, copter.beaconParams);
+    return 0;
 }
 
 // type: 2:A point; 3: B point; 1: Break point.

@@ -314,6 +314,12 @@ void Copter::exit_mode(Copter::Mode *&old_flightmode,
         }
     }
 #endif //HELI_FRAME
+
+#if MODE_ABZZ_ENABLED == ENABLED
+    if (old_flightmode == &mode_abzz) {
+        mode_abzz.exit_ab_mode();
+    }
+#endif
 }
 
 // notify_flight_mode - sets notify object based on current flight mode.  Only used for OreoLED notify device
