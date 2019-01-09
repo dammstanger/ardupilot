@@ -1935,7 +1935,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_clear_point_ab()
 MAV_RESULT GCS_MAVLINK_Copter::handle_command_start_work(const mavlink_command_long_t &packet)
 {
     MAV_RESULT result = MAV_RESULT_FAILED;
-    if(copter.flightmode == &copter.mode_loiter) {
+    if(copter.flightmode != &copter.mode_auto && copter.flightmode != &copter.mode_abzz) {
         //1define as auto mode
         if(is_equal(packet.param1,1.0f)){
             if(set_mode(AUTO)) result = MAV_RESULT_ACCEPTED;
