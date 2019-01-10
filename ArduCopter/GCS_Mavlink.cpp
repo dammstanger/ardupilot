@@ -661,6 +661,9 @@ void GCS_MAVLINK_Copter::handleMessage(mavlink_message_t* msg)
 		mavlink_msg_change_operator_control_ack_send(chan, 255, packet.control_request, !copter.authDone);
 		gcs().send_text(MAV_SEVERITY_CRITICAL, "get a auth key : %s, auth is %d.\n\r", packet.passkey, copter.authDone);
 	}
+        else if(MAVLINK_MSG_ID_AUTOPILOT_VERSION_REQUEST == msg->msgid)  {
+            handle_send_autopilot_version(msg);
+        }
 
 	///////////
 	// for test only, show remove later.
@@ -2045,6 +2048,8 @@ uint32_t GCS_MAVLINK_Copter::setSpecialPointInfo(uint8_t type)
 	}
     //handle msg for abzz mode
     copter.mode_abzz.handle_set_pecial_point_Info(type, copter.beaconParams);
+    if((1 == type) || (4 == type))
+        sendSpecialPointInfo(type);
     return 0;
 }
 
@@ -2055,7 +2060,7 @@ uint32_t GCS_MAVLINK_Copter::sendSpecialPointInfo(uint8_t type)
 		mavlink_msg_special_point_info_send(chan, type, 0, 0, copter.beaconParams.aPointLatitude, copter.beaconParams.aPointLongitude);
 	} else if(3 == type) {
 		mavlink_msg_special_point_info_send(chan, type, 0, 0, copter.beaconParams.bPointLatitude, copter.beaconParams.bPointLongitude);
-	} else if(1 == type) {
+	} else if((1 == type) || (4 == type)) {
 		mavlink_msg_special_point_info_send(chan, type, copter.beaconParams.breakDirection, copter.beaconParams.seqOfNextWayPoint, copter.beaconParams.breakPointLatitude, copter.beaconParams.breakPointLongitude);
 	} else {
 		gcs().send_text(MAV_SEVERITY_CRITICAL, "Get error beacon special point: id %d\n\r", type);

@@ -1498,8 +1498,8 @@ void GCS_MAVLINK::send_autopilot_version() const
 {
     uint32_t flight_sw_version;
     uint32_t middleware_sw_version = 0;
-    uint32_t os_sw_version = 0;
-    uint32_t board_version = 0;
+    uint32_t os_sw_version = 666666;
+    uint32_t board_version = 888888;
     char flight_custom_version[MAVLINK_MSG_AUTOPILOT_VERSION_FIELD_FLIGHT_CUSTOM_VERSION_LEN]{};
     char middleware_custom_version[MAVLINK_MSG_AUTOPILOT_VERSION_FIELD_MIDDLEWARE_CUSTOM_VERSION_LEN]{};
     char os_custom_version[MAVLINK_MSG_AUTOPILOT_VERSION_FIELD_OS_CUSTOM_VERSION_LEN]{};
@@ -2345,7 +2345,7 @@ void GCS_MAVLINK::handle_beacon_message(const mavlink_message_t* msg)
 		default:
 			break;
 		}
-	
+
 		setSpecialPointInfo(packet1.point_type);
 		
 		break;
