@@ -158,7 +158,7 @@ bool AP_Arming::barometer_checks(bool report)
     if ((checks_to_perform & ARMING_CHECK_ALL) ||
         (checks_to_perform & ARMING_CHECK_BARO)) {
         if (!AP::baro().all_healthy()) {
-            check_failed(ARMING_CHECK_BARO, report, "Barometer not healthy");
+            check_failed(ARMING_CHECK_BARO, report, "[01217]Barometer not healthy");
             return false;
         }
     }
@@ -191,11 +191,11 @@ bool AP_Arming::logging_checks(bool report)
     if ((checks_to_perform & ARMING_CHECK_ALL) ||
         (checks_to_perform & ARMING_CHECK_LOGGING)) {
         if (DataFlash_Class::instance()->logging_failed()) {
-            check_failed(ARMING_CHECK_LOGGING, report, "Logging failed");
+            check_failed(ARMING_CHECK_LOGGING, report, "[01218]Logging failed");
             return false;
         }
         if (!DataFlash_Class::instance()->CardInserted()) {
-            check_failed(ARMING_CHECK_LOGGING, report, "No SD card");
+            check_failed(ARMING_CHECK_LOGGING, report, "[01219]No SD card");
             return false;
         }
     }
@@ -278,37 +278,37 @@ bool AP_Arming::ins_checks(bool report)
         (checks_to_perform & ARMING_CHECK_INS)) {
         const AP_InertialSensor &ins = AP::ins();
         if (!ins.get_gyro_health_all()) {
-            check_failed(ARMING_CHECK_INS, report, "Gyros not healthy");
+            check_failed(ARMING_CHECK_INS, report, "[01220]Gyros not healthy");
             return false;
         }
         if (!ins.gyro_calibrated_ok_all()) {
-            check_failed(ARMING_CHECK_INS, report, "Gyros not calibrated");
+            check_failed(ARMING_CHECK_INS, report, "[01221]Gyros not calibrated");
             return false;
         }
         if (!ins.get_accel_health_all()) {
-            check_failed(ARMING_CHECK_INS, report, "Accels not healthy");
+            check_failed(ARMING_CHECK_INS, report, "[01222]Accels not healthy");
             return false;
         }
         if (!ins.accel_calibrated_ok_all()) {
-            check_failed(ARMING_CHECK_INS, report, "3D Accel calibration needed");
+            check_failed(ARMING_CHECK_INS, report, "[01223]3D Accel calibration needed");
             return false;
         }
         
         //check if accelerometers have calibrated and require reboot
         if (ins.accel_cal_requires_reboot()) {
-            check_failed(ARMING_CHECK_INS, report, "Accels calibrated requires reboot");
+            check_failed(ARMING_CHECK_INS, report, "[01224]Accels calibrated requires reboot");
             return false;
         }
 
         // check all accelerometers point in roughly same direction
         if (!ins_accels_consistent(ins)) {
-            check_failed(ARMING_CHECK_INS, report, "Accels inconsistent");
+            check_failed(ARMING_CHECK_INS, report, "[01225]Accels inconsistent");
             return false;
         }
 
         // check all gyros are giving consistent readings
         if (!ins_gyros_consistent(ins)) {
-            check_failed(ARMING_CHECK_INS, report, "Gyros inconsistent");
+            check_failed(ARMING_CHECK_INS, report, "[01226]Gyros inconsistent");
             return false;
         }
     }
@@ -329,12 +329,12 @@ bool AP_Arming::compass_checks(bool report)
         }
 
         if (!_compass.healthy()) {
-            check_failed(ARMING_CHECK_COMPASS, report, "Compass not healthy");
+            check_failed(ARMING_CHECK_COMPASS, report, "[01214]Compass not healthy");
             return false;
         }
         // check compass learning is on or offsets have been set
         if (!_compass.learn_offsets_enabled() && !_compass.configured()) {
-            check_failed(ARMING_CHECK_COMPASS, report, "Compass not calibrated");
+            check_failed(ARMING_CHECK_COMPASS, report, "[01204]Compass not calibrated");
             return false;
         }
 
@@ -346,27 +346,27 @@ bool AP_Arming::compass_checks(bool report)
 
         //check if compass has calibrated and requires reboot
         if (_compass.compass_cal_requires_reboot()) {
-            check_failed(ARMING_CHECK_COMPASS, report, "Compass calibrated requires reboot");
+            check_failed(ARMING_CHECK_COMPASS, report, "[01215]Compass calibrated requires reboot");
             return false;
         }
 
         // check for unreasonable compass offsets
         Vector3f offsets = _compass.get_offsets();
         if (offsets.length() > _compass.get_offsets_max()) {
-            check_failed(ARMING_CHECK_COMPASS, report, "Compass offsets too high");
+            check_failed(ARMING_CHECK_COMPASS, report, "[01227]Compass offsets too high");
             return false;
         }
 
         // check for unreasonable mag field length
         float mag_field = _compass.get_field().length();
         if (mag_field > AP_ARMING_COMPASS_MAGFIELD_MAX || mag_field < AP_ARMING_COMPASS_MAGFIELD_MIN) {
-            check_failed(ARMING_CHECK_COMPASS, report, "Check mag field");
+            check_failed(ARMING_CHECK_COMPASS, report, "[01228]Check mag field");
             return false;
         }
 
         // check all compasses point in roughly same direction
         if (!_compass.consistent()) {
-            check_failed(ARMING_CHECK_COMPASS, report, "Compasses inconsistent");
+            check_failed(ARMING_CHECK_COMPASS, report, "[01229]Compasses inconsistent");
             return false;
         }
     }
@@ -382,25 +382,25 @@ bool AP_Arming::gps_checks(bool report)
         //GPS OK?
         if (!AP::ahrs().home_is_set() ||
             gps.status() < AP_GPS::GPS_OK_FIX_3D) {
-            check_failed(ARMING_CHECK_GPS, report, "Bad GPS Position");
+            check_failed(ARMING_CHECK_GPS, report, "[01230]Bad GPS Position");
             return false;
         }
 
         //GPS update rate acceptable
         if (!gps.is_healthy()) {
-            check_failed(ARMING_CHECK_GPS, report, "GPS is not healthy");
+            check_failed(ARMING_CHECK_GPS, report, "[01209]GPS is not healthy");
             return false;
         }
 
         // check GPSs are within 50m of each other and that blending is healthy
         float distance_m;
         if (!gps.all_consistent(distance_m)) {
-            check_failed(ARMING_CHECK_GPS, report, "GPS positions differ by %4.1fm",
+            check_failed(ARMING_CHECK_GPS, report, "[01231]GPS positions differ by %4.1fm",
                          (double)distance_m);
             return false;
         }
         if (!gps.blend_health_check()) {
-            check_failed(ARMING_CHECK_GPS, report, "GPS blending unhealthy");
+            check_failed(ARMING_CHECK_GPS, report, "[01232]GPS blending unhealthy");
             return false;
         }
 
@@ -411,7 +411,7 @@ bool AP_Arming::gps_checks(bool report)
             const float distance = location_diff(gps_loc, ahrs_loc).length();
             if (distance > AP_ARMING_AHRS_GPS_ERROR_MAX) {
                 if (report) {
-                    gcs().send_text(MAV_SEVERITY_CRITICAL, "PreArm: GPS and AHRS differ by %4.1fm", (double)distance);
+                    gcs().send_text(MAV_SEVERITY_CRITICAL, "[01201]PreArm: GPS and AHRS differ by %4.1fm", (double)distance);
                 }
                 return false;
             }
@@ -423,7 +423,7 @@ bool AP_Arming::gps_checks(bool report)
         if (first_unconfigured != AP_GPS::GPS_ALL_CONFIGURED) {
             if (report) {
                 gcs().send_text(MAV_SEVERITY_CRITICAL,
-                                                 "PreArm: GPS %d failing configuration checks",
+                                                 "[01202]PreArm: GPS %d failing configuration checks",
                                                   first_unconfigured + 1);
                 gps.broadcast_first_configuration_failure_reason();
             }
@@ -440,13 +440,13 @@ bool AP_Arming::battery_checks(bool report)
         (checks_to_perform & ARMING_CHECK_BATTERY)) {
 
         if (AP_Notify::flags.failsafe_battery) {
-            check_failed(ARMING_CHECK_BATTERY, report, "Battery failsafe on");
+            check_failed(ARMING_CHECK_BATTERY, report, "[01205]Battery failsafe on");
             return false;
         }
 
         for (uint8_t i = 0; i < _battery.num_instances(); i++) {
             if ((_min_voltage[i] > 0.0f) && (_battery.voltage(i) < _min_voltage[i])) {
-                check_failed(ARMING_CHECK_BATTERY, report, "PreArm: Battery %d voltage %.1f below minimum %.1f",
+                check_failed(ARMING_CHECK_BATTERY, report, "[01233]PreArm: Battery %d voltage %.1f below minimum %.1f",
                             i+1,
                             (double)_battery.voltage(i),
                              (double)_min_voltage[i]);
@@ -487,13 +487,13 @@ bool AP_Arming::rc_calibration_checks(bool report)
         const uint16_t trim = ch->get_radio_trim();
         if (ch->get_radio_min() > trim) {
             if (report) {
-                gcs().send_text(MAV_SEVERITY_CRITICAL, "PreArm: RC%d minimum is greater than trim", i + 1);
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "[01203]PreArm: RC%d minimum is greater than trim", i + 1);
             }
             check_passed = false;
         }
         if (ch->get_radio_max() < trim) {
             if (report) {
-                gcs().send_text(MAV_SEVERITY_CRITICAL, "PreArm: RC%d maximum is less than trim", i + 1);
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "[01203]PreArm: RC%d maximum is less than trim", i + 1);
             }
             check_passed = false;
         }
@@ -508,7 +508,7 @@ bool AP_Arming::manual_transmitter_checks(bool report)
         (checks_to_perform & ARMING_CHECK_RC)) {
 
         if (AP_Notify::flags.failsafe_radio) {
-            check_failed(ARMING_CHECK_RC, report, "Radio failsafe on");
+            check_failed(ARMING_CHECK_RC, report, "[01234]Radio failsafe on");
             return false;
         }
 
@@ -553,7 +553,7 @@ bool AP_Arming::board_voltage_checks(bool report)
     // check board voltage
     if ((checks_to_perform & ARMING_CHECK_ALL) || (checks_to_perform & ARMING_CHECK_VOLTAGE)) {
         if(((hal.analogin->board_voltage() < AP_ARMING_BOARD_VOLTAGE_MIN) || (hal.analogin->board_voltage() > AP_ARMING_BOARD_VOLTAGE_MAX))) {
-            check_failed(ARMING_CHECK_VOLTAGE, report, "Check board voltage");
+            check_failed(ARMING_CHECK_VOLTAGE, report, "[01235]Check board voltage");
             return false;
         }
     }
@@ -600,7 +600,7 @@ bool AP_Arming::arm_checks(uint8_t method)
         DataFlash_Class *df = DataFlash_Class::instance();
         df->PrepForArming();
         if (!df->logging_started()) {
-            check_failed(ARMING_CHECK_LOGGING, true, "Logging not started");
+            check_failed(ARMING_CHECK_LOGGING, true, "[01218]Logging not started");
             return false;
         }
     }
@@ -622,7 +622,7 @@ bool AP_Arming::arm(uint8_t method, const bool do_arming_checks)
     if (!do_arming_checks || checks_to_perform == ARMING_CHECK_NONE) {
         armed = true;
         arming_method = NONE;
-        gcs().send_text(MAV_SEVERITY_INFO, "Throttle armed");
+        gcs().send_text(MAV_SEVERITY_INFO, "[01600]Throttle armed");
         return true;
     }
 
@@ -630,7 +630,7 @@ bool AP_Arming::arm(uint8_t method, const bool do_arming_checks)
         armed = true;
         arming_method = method;
 
-        gcs().send_text(MAV_SEVERITY_INFO, "Throttle armed");
+        gcs().send_text(MAV_SEVERITY_INFO, "[01600]Throttle armed");
 
         //TODO: Log motor arming to the dataflash
         //Can't do this from this class until there is a unified logging library
@@ -656,7 +656,7 @@ bool AP_Arming::disarm()
     }
     armed = false;
 
-    gcs().send_text(MAV_SEVERITY_INFO, "Throttle disarmed");
+    gcs().send_text(MAV_SEVERITY_INFO, "[01601]Throttle disarmed");
 
     //TODO: Log motor disarming to the dataflash
     //Can't do this from this class until there is a unified logging library.
@@ -688,15 +688,15 @@ bool AP_Arming::rc_checks_copter_sub(const bool display_failure, const RC_Channe
         const char *channel_name = channel_names[i];
         // check if radio has been calibrated
         if (check_min_max && !channel->min_max_configured()) {
-            check_failed(ARMING_CHECK_RC, display_failure, "RC %s not configured", channel_name);
+            check_failed(ARMING_CHECK_RC, display_failure, "[01236]RC %s not configured", channel_name);
             ret = false;
         }
         if (channel->get_radio_min() > 1300) {
-            check_failed(ARMING_CHECK_RC, display_failure, "%s radio min too high", channel_name);
+            check_failed(ARMING_CHECK_RC, display_failure, "[01236]%s radio min too high", channel_name);
             ret = false;
         }
         if (channel->get_radio_max() < 1700) {
-            check_failed(ARMING_CHECK_RC, display_failure, "%s radio max too low", channel_name);
+            check_failed(ARMING_CHECK_RC, display_failure, "[01236]%s radio max too low", channel_name);
             ret = false;
         }
         bool fail = true;
@@ -705,13 +705,13 @@ bool AP_Arming::rc_checks_copter_sub(const bool display_failure, const RC_Channe
             fail = false;
         }
         if (channel->get_radio_trim() < channel->get_radio_min()) {
-            check_failed(ARMING_CHECK_RC, display_failure, "%s radio trim below min", channel_name);
+            check_failed(ARMING_CHECK_RC, display_failure, "[01236]%s radio trim below min", channel_name);
             if (fail) {
                 ret = false;
             }
         }
         if (channel->get_radio_trim() > channel->get_radio_max()) {
-            check_failed(ARMING_CHECK_RC, display_failure, "%s radio trim above max", channel_name);
+            check_failed(ARMING_CHECK_RC, display_failure, "[01236]%s radio trim above max", channel_name);
             if (fail) {
                 ret = false;
             }

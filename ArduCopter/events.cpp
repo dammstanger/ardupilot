@@ -77,7 +77,7 @@ void Copter::handle_battery_failsafe(const char *type_str, const int8_t action)
 				set_mode_Loiter(MODE_REASON_BATTERY_FAILSAFE);
 				break;
 			case Failsafe_Action_Alarm:
-				gcs().send_text(MAV_SEVERITY_CRITICAL, "Dangerous, Low battery!");	
+				gcs().send_text(MAV_SEVERITY_CRITICAL, "[11200]Dangerous, Low battery!");
 				break;
 			
             case Failsafe_Action_Terminate:

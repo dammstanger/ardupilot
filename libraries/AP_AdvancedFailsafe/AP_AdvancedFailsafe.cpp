@@ -163,7 +163,7 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
     if(_enable_geofence_fs) {
         if (geofence_breached || check_altlimit()) {
             if (!_terminate) {
-                gcs().send_text(MAV_SEVERITY_CRITICAL, "Terminating due to fence breach");
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "[10200]Terminating due to fence breach");
                 _terminate.set_and_notify(1);
             }
         }
@@ -177,7 +177,7 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
         (mode == AFS_MANUAL || mode == AFS_STABILIZED || !_rc_term_manual_only) &&
         _rc_fail_time_seconds > 0 &&
             (AP_HAL::millis() - last_valid_rc_ms) > (_rc_fail_time_seconds * 1000.0f)) {
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "Terminating due to RC failure");
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "[10201]Terminating due to RC failure");
         _terminate.set_and_notify(1);
     }
     
@@ -241,7 +241,7 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
             // leads to termination if AFS_DUAL_LOSS is 1
             if(_enable_dual_loss) {
                 if (!_terminate) {
-                    gcs().send_text(MAV_SEVERITY_CRITICAL, "Terminating due to dual loss");
+                    gcs().send_text(MAV_SEVERITY_CRITICAL, "[10202]Terminating due to dual loss");
                     _terminate.set_and_notify(1);
                 }
             }
@@ -263,7 +263,7 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
             // losing GCS link when GPS lock lost
             // leads to termination if AFS_DUAL_LOSS is 1
             if (!_terminate && _enable_dual_loss) {
-                gcs().send_text(MAV_SEVERITY_CRITICAL, "Terminating due to dual loss");
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "[10202]Terminating due to dual loss");
                 _terminate.set_and_notify(1);
             }
         } else if (gps_lock_ok) {
