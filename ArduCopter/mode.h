@@ -292,7 +292,7 @@ public:
     bool sample_ab_point(uint8_t get_b, Location_Class& loc);
     bool clear_ab_point();
     bool change_shiftwidth(uint16_t new_width_cm);
-    bool save_ab_shiftdir(int8_t direction);
+    bool save_ab_shiftdir(int16_t direction);
     void save_ab_shiftdir_RC();
     void set_ab_desired_terrain_alt(uint16_t desired_alt_cm);
     bool set_work_speed(const uint16_t speed);

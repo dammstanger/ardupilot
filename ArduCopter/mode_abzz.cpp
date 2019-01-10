@@ -579,7 +579,7 @@ bool Copter::ModeABZz::sample_ab_point(uint8_t get_b, Location_Class& loc)
     return result;
 }
 
-bool Copter::ModeABZz::save_ab_shiftdir(int8_t direction)
+bool Copter::ModeABZz::save_ab_shiftdir(int16_t direction)
 {
     //choose direction by roll stick moving direction
     if( _sta_absetting == SEL_SHIFT_DIR){
