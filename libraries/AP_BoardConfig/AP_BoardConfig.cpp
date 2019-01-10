@@ -274,7 +274,7 @@ void AP_BoardConfig::sensor_config_error(const char *reason)
     */
     while (true) {
         printf("Sensor failure: %s\n", reason);
-        gcs().send_text(MAV_SEVERITY_ERROR, "Check BRD_TYPE: %s", reason);
+        gcs().send_text(MAV_SEVERITY_ERROR, "[12300]Check BRD_TYPE: %s", reason);
         hal.scheduler->delay(3000);
     }
 }

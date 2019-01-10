@@ -760,7 +760,7 @@ bool Copter::ModeAuto::verify_command(const AP_Mission::Mission_Command& cmd)
 
     default:
         // error message
-        gcs().send_text(MAV_SEVERITY_WARNING,"Skipping invalid cmd #%i",cmd.id);
+        gcs().send_text(MAV_SEVERITY_WARNING,"[06400]Skipping invalid cmd #%i",cmd.id);
         // return true if we do not recognize the command so that we move on to the next command
         return true;
     }
@@ -1134,10 +1134,10 @@ void Copter::ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd)
 		target_loc.lng = copter.beaconParams.breakPointLongitude;
 		target_loc.flags.unused1 = copter.beaconParams.sprayFlag;
 
-		gcs().send_text(MAV_SEVERITY_CRITICAL, "set breakpoint, %d , %d, %d\n\r", target_loc.lat, target_loc.lng, target_loc.flags.unused1);
+		gcs().send_text(MAV_SEVERITY_CRITICAL, "[06200]set breakpoint, %d , %d, %d\n\r", target_loc.lat, target_loc.lng, target_loc.flags.unused1);
 	}
 	else{
-		gcs().send_text(MAV_SEVERITY_CRITICAL, "set point wp, %d , %d, alt %d\n\r", target_loc.lat, target_loc.lng, target_loc.alt);
+		gcs().send_text(MAV_SEVERITY_CRITICAL, "[06201]set point wp, %d , %d, alt %d\n\r", target_loc.lat, target_loc.lng, target_loc.alt);
 	}
 
     const Location_Class &current_loc = copter.current_loc;

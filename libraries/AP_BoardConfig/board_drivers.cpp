@@ -108,7 +108,7 @@ void AP_BoardConfig::board_setup_drivers(void)
     case PX4_BOARD_MINDPXV2:
         break;
     default:
-        sensor_config_error("Unknown board type");
+        sensor_config_error("[12300]Unknown board type");
         break;
     }
 }
@@ -232,7 +232,7 @@ void AP_BoardConfig::board_autodetect(void)
         state.board_type.set(PX4_BOARD_PIXHAWK);
         hal.console->printf("Detected Pixhawk\n");
     } else {
-        sensor_config_error("Unable to detect board type");
+        sensor_config_error("[12300]Unable to detect board type");
     }
 #elif defined(CONFIG_ARCH_BOARD_PX4FMU_V4) || defined(HAL_CHIBIOS_ARCH_FMUV4)
     // only one choice

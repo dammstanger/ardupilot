@@ -881,7 +881,7 @@ AP_InertialSensor::detect_backends(void)
     _enable_mask.set(found_mask);
 
     if (_backend_count == 0) {
-        AP_BoardConfig::sensor_config_error("INS: unable to initialise driver");
+        AP_BoardConfig::sensor_config_error("[12302]INS: unable to initialise driver");
     }
 }
 

@@ -702,7 +702,7 @@ bool AP_IOMCU::check_crc(void)
     if (!upload_fw()) {
         free(fw);
         fw = nullptr;
-        AP_BoardConfig::sensor_config_error("Failed to update IO firmware");
+        AP_BoardConfig::sensor_config_error("[12303]Failed to update IO firmware");
     }
     
     free(fw);

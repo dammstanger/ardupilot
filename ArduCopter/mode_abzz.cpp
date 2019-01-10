@@ -16,14 +16,14 @@ bool Copter::ModeABZz::init(bool ignore_checks)
 {
     // TODO: we need to reject into this mode when the AB point and necessary work set is not complete
     if(!copter.position_ok()){
-         gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: position is not OK.");
+         gcs().send_text(MAV_SEVERITY_ERROR, "[05300]ABZZ: position is not OK.");
          _sta_abzz = StandBy;
          return false;
     }
 
     // reject switching to auto mode if landed with motors armed but first command is not a takeoff (reduce chance of flips)
     if (!motors->armed() || ap.land_complete) {
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "ABZZ: need Takeoff.");
+        gcs().send_text(MAV_SEVERITY_ERROR, "[05301]ABZZ: need Takeoff.");
         _sta_abzz = StandBy;
         return false;
     }
@@ -31,16 +31,16 @@ bool Copter::ModeABZz::init(bool ignore_checks)
     if(_sta_absetting!=AB_POINT_CMPLT){
         switch(_sta_absetting){
             case SAMPLE_A:
-                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need A and B point.");
+                gcs().send_text(MAV_SEVERITY_ERROR, "[05302]ABZZ: need A and B point.");
                 break;
             case SAMPLE_B:
-                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need B point.");
+                gcs().send_text(MAV_SEVERITY_ERROR, "[05303]ABZZ: need B point.");
                 break;
             case SEL_SHIFT_DIR:
-                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need shift direction.");
+                gcs().send_text(MAV_SEVERITY_ERROR, "[05304]ABZZ: need shift direction.");
                 break;
             case GET_AB_BEAR_REV:
-                gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need bear rev to recover.");
+                gcs().send_text(MAV_SEVERITY_ERROR, "[0530]ABZZ: need bear rev to recover.");
                 break;
 
             default:
@@ -154,7 +154,7 @@ void Copter::ModeABZz::update_abwp_sta()
 
     case Start:{
             //now we can start auto flight
-            gcs().send_text(MAV_SEVERITY_INFO, "ab start");
+            gcs().send_text(MAV_SEVERITY_INFO, "[05600]ab start");
 
             //
             if(!generate_next_abline()){
@@ -180,7 +180,7 @@ void Copter::ModeABZz::update_abwp_sta()
                 _sta_abzz = GotoWork;
                 _mode = Abzz_WP;
             }else{
-                gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
+                gcs().send_text(MAV_SEVERITY_ERROR, "[05306]ABZZ: terrain follow failed.");
                 brake_and_exit(true);
                 _sta_abzz = StandBy;
             }
@@ -206,7 +206,7 @@ void Copter::ModeABZz::update_abwp_sta()
                 _sta_abzz = GotoWork;
                 _mode = Abzz_WP;
             }else{
-                gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
+                gcs().send_text(MAV_SEVERITY_ERROR, "[05306]ABZZ: terrain follow failed.");
                 brake_and_exit(true);
                 _sta_abzz = StandBy;
             }
@@ -228,13 +228,13 @@ void Copter::ModeABZz::update_abwp_sta()
                 loiter_time = 0;
 
                 //update yaw
-                auto_yaw.set_fixed_yaw(_ab_bearing_deg/100.0f, 20.0f, 0, false);
+                auto_yaw.set_fixed_yaw(_ab_bearing_deg, 20.0f, 0, false);
 
                 _sta_abzz = AToB;
                 //enable sprayer
                 operate_sprayer(true);
             }else{
-                gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
+                gcs().send_text(MAV_SEVERITY_ERROR, "[05306]ABZZ: terrain follow failed.");
                 brake_and_exit(true);
                 _sta_abzz = StandBy;
             }
@@ -273,7 +273,7 @@ void Copter::ModeABZz::update_abwp_sta()
                 //enable sprayer
                 operate_sprayer(false);
             }else{
-                gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
+                gcs().send_text(MAV_SEVERITY_ERROR, "[05306]ABZZ: terrain follow failed.");
                 brake_and_exit(true);
                 _sta_abzz = StandBy;
             }
@@ -305,7 +305,7 @@ void Copter::ModeABZz::update_abwp_sta()
                 //enable sprayer
                 operate_sprayer(false);
             }else{
-                gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: terrain follow failed.");
+                gcs().send_text(MAV_SEVERITY_ERROR, "[05306]ABZZ: terrain follow failed.");
                 brake_and_exit(true);
                 _sta_abzz = StandBy;
             }
@@ -357,7 +357,7 @@ void Copter::ModeABZz::record_breakpoint()
         _point_break = temp_loc;
     }
 
-    gcs().send_text(MAV_SEVERITY_INFO, "ABZz: break_point recorded");
+    gcs().send_text(MAV_SEVERITY_INFO, "[05601]ABZz: break_point recorded");
 }
 
 void Copter::ModeABZz::set_breakpoint(Location_Class& brk_point)
@@ -419,7 +419,7 @@ void Copter::ModeABZz::exit_ab_mode()
         record_breakpoint();
         //update ab info
         if(!update_ab_status_to_current(UPDATE_AB_REASON_BREAK)){
-            gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: update ab point failed when exit.");
+            gcs().send_text(MAV_SEVERITY_ERROR, "[05305]ABZZ: update ab point failed when exit.");
         }
         //fill the work information to beacon message
         record_workinfo_for_beacon_msg();
@@ -450,7 +450,7 @@ bool Copter::ModeABZz::check_ab_point_validity()
 #endif
     Location_Class home(ahrs.get_home());
     if(_point_a.get_distance(home) > dist_limit_m || _point_b.get_distance(home) > dist_limit_m){
-        gcs().send_text(MAV_SEVERITY_ERROR, "ABZz: A / B point location is exceed distance limit");
+        gcs().send_text(MAV_SEVERITY_ERROR, "[05312]ABZZ: A / B point location is exceed distance limit");
         return false;
     }
     return true;
@@ -474,10 +474,10 @@ bool Copter::ModeABZz::check_break_point_validity()
 
         //we give 10m and 20m as margin to judge if break point is unreasonable
         if(dist_brk2a + dist_brk2b >  dist_a2b+10.0f && dist_brk2a > 20.0f && dist_brk2b > 20.0f){
-            gcs().send_text(MAV_SEVERITY_ERROR, "ABZz: break point location is unreasonable");
+            gcs().send_text(MAV_SEVERITY_ERROR, "[05313]ABZZ: break point location is unreasonable");
             return false;
         }else if(_point_break.get_distance(home) > dist_limit_m){
-            gcs().send_text(MAV_SEVERITY_ERROR, "ABZz: break point location is exceed distance limit");
+            gcs().send_text(MAV_SEVERITY_ERROR, "[05314]ABZZ: break point location is exceed distance limit");
             return false;
         }
         return true;
@@ -559,22 +559,22 @@ bool Copter::ModeABZz::sample_ab_point(uint8_t get_b, Location_Class& loc)
         if(get_b){
             _point_b = loc;
             _sta_absetting = SEL_SHIFT_DIR;
-            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: point B stored");
+            gcs().send_text(MAV_SEVERITY_INFO, "[05602]ABZZ: point B stored");
             result = true;
         }else{
-            gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need point B");
+            gcs().send_text(MAV_SEVERITY_ERROR, "[05303]ABZZ: need point B");
         }
     }else if(_sta_absetting == SAMPLE_A || _sta_absetting == SEL_SHIFT_DIR){
         if(!get_b){
             _point_a = loc;
             _sta_absetting = SAMPLE_B;
-            gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: point A stored");
+            gcs().send_text(MAV_SEVERITY_INFO, "[05603]ABZZ: point A stored");
             result = true;
         }else{
-            gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: need point A");
+            gcs().send_text(MAV_SEVERITY_ERROR, "[05308]ABZZ: need point A");
         }
     }else {
-        gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: clear AB point first");
+        gcs().send_text(MAV_SEVERITY_ERROR, "[05309]ABZZ: clear AB point first");
     }
     return result;
 }
@@ -643,7 +643,7 @@ bool Copter::ModeABZz::change_shiftwidth(uint16_t new_width_cm)
          gcs().send_text(MAV_SEVERITY_INFO, "ABZZ: set shift width: %d cm", _shift_width_cm);
         return true;
     }else{
-        gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ:change width failed");
+        gcs().send_text(MAV_SEVERITY_ERROR, "[05315]ABZZ:change width failed");
         return false;
     }
 }
@@ -668,7 +668,7 @@ bool Copter::ModeABZz::generate_next_abline()
     _shift_count++;
     if(generate_abline(_shift_count)) result = true;
     else _shift_count--;
-    gcs().send_text(MAV_SEVERITY_WARNING, "_shift_count = %d", _shift_count);
+    gcs().send_text(MAV_SEVERITY_DEBUG, "_shift_count = %d", _shift_count);
 
     _mutex_ab_param = false;
 
@@ -692,11 +692,11 @@ bool Copter::ModeABZz::generate_abline(uint16_t shift_cnt)
     Vector3f vet_a;
     Vector3f vet_b;
     if(!_point_a.get_vector_from_origin_NEU(vet_a)){
-        gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: point a position error.");
+        gcs().send_text(MAV_SEVERITY_ERROR, "[05310]ABZZ: point a position error.");
         return false;
     }
     if(!_point_b.get_vector_from_origin_NEU(vet_b)){
-        gcs().send_text(MAV_SEVERITY_ERROR, "ABZZ: point b position error.");
+        gcs().send_text(MAV_SEVERITY_ERROR, "[05311]ABZZ: point b position error.");
         return false;
     }
 
@@ -716,7 +716,7 @@ bool Copter::ModeABZz::generate_abline(uint16_t shift_cnt)
     float ofs_x = cosf(radians(shift_bearing_deg))*_shift_width_cm*shift_cnt;
     float ofs_y  = sinf(radians(shift_bearing_deg))*_shift_width_cm*shift_cnt;
 
-    gcs().send_text(MAV_SEVERITY_INFO, "ofs_x=%f,ofs_y=%f", ofs_x, ofs_y);
+    gcs().send_text(MAV_SEVERITY_DEBUG, "ofs_x=%f,ofs_y=%f", ofs_x, ofs_y);
     _point_shift_a += Vector3f(ofs_x,ofs_y,0);
     _point_shift_b += Vector3f(ofs_x,ofs_y,0);
 

@@ -601,7 +601,7 @@ void AP_Baro::init(void)
 #if CONFIG_HAL_BOARD != HAL_BOARD_F4LIGHT // most boards requires external baro
 
     if (_num_drivers == 0 || _num_sensors == 0 || drivers[0] == nullptr) {
-        AP_BoardConfig::sensor_config_error("Baro: unable to initialise driver");
+        AP_BoardConfig::sensor_config_error("[12301]Baro: unable to initialise driver");
     }
 #endif
 }
