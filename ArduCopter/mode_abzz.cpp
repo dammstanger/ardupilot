@@ -534,16 +534,18 @@ bool Copter::ModeABZz::update_ab_status_to_current(ABUpdate_Reason_eu reason)
 {
     if(_mutex_ab_param) return false;
 
+    if(_shift_count%2!=0){
+         //if we reverse the AB shift point to BA, use flag to mark this exhange.
+         //_flag.ab_bearing_reverse is used to track the original sample AB point.
+        _flags.ab_bearing_reverse  = !_flags.ab_bearing_reverse;
+    }
+
     //means we are working in AB mode or be paused from the mode
     if(_sta_absetting == AB_POINT_CMPLT && _shift_count!=0){
         Location_Class curr_a(_point_shift_a);
         Location_Class curr_b(_point_shift_b);
         if(!set_ab_point(curr_a, curr_b, reason, 3)) return false;
-        if(_shift_count%2!=0){
-             //if we reverse the AB shift point to BA, use flag to mark this exhange.
-             //_flag.ab_bearing_reverse is used to track the original sample AB point.
-            _flags.ab_bearing_reverse  = !_flags.ab_bearing_reverse;
-        }
+
     }
     return true;
 }
@@ -608,17 +610,7 @@ void Copter::ModeABZz::save_ab_shiftdir_RC()
         }
     }
 }
-/*
-void Copter::ModeABZz::recover_ab_base_info(BeaconParams& param)
-{
-    //fill ab location info
-    Location_Class loc_a(param.aPointLatitude, param.aPointLongitude, param.height, ALT_FRAME_ABOVE_TERRAIN);
-    Location_Class loc_b(param.bPointLatitude, param.bPointLongitude, param.height, ALT_FRAME_ABOVE_TERRAIN);
-    copter.mode_abzz.set_ab_point(loc_a, loc_b, UPDATE_AB_REASON_GCSSET, 3);
 
-    _flags.ab_bearing_set = false;
-}
-*/
 void Copter::ModeABZz::set_ab_bearing_reverse_flag(uint8_t flag)
 {
     if(flag) 
@@ -1228,24 +1220,24 @@ void Copter::ModeABZz::handle_set_pecial_point_Info(uint8_t info_type, BeaconPar
 {
     if(copter.flightmode == &copter.mode_loiter){
         switch(info_type){
-            case 1:{
+            case 4:{
                 Location_Class loc_break(param.aPointLatitude, param.aPointLongitude, param.height, Location_Class::ALT_FRAME_ABOVE_TERRAIN);
-                copter.mode_abzz.set_breakpoint(loc_break);
-                copter.mode_abzz.set_ab_bearing_reverse_flag(copter.beaconParams.breakDirection);
+                set_breakpoint(loc_break);
+                set_ab_bearing_reverse_flag(param.breakDirection);
                 gcs().send_text(MAV_SEVERITY_DEBUG, "set break point.");
             }break;
 
             case 2:{
                 Location_Class loc_a(param.aPointLatitude, param.aPointLongitude, param.height, Location_Class::ALT_FRAME_ABOVE_TERRAIN);
                 Location_Class loc_b;
-                copter.mode_abzz.set_ab_point(loc_a, loc_b, UPDATE_AB_REASON_GCSSET, 0x01);
+                set_ab_point(loc_a, loc_b, UPDATE_AB_REASON_GCSSET, 0x01);
                 gcs().send_text(MAV_SEVERITY_DEBUG, "set a point.");
             }break;
 
             case 3:{
                 Location_Class loc_b(param.aPointLatitude, param.aPointLongitude, param.height, Location_Class::ALT_FRAME_ABOVE_TERRAIN);
                 Location_Class loc_a;
-                copter.mode_abzz.set_ab_point(loc_a, loc_b, UPDATE_AB_REASON_GCSSET, 0x02);
+                set_ab_point(loc_a, loc_b, UPDATE_AB_REASON_GCSSET, 0x02);
                 gcs().send_text(MAV_SEVERITY_DEBUG, "set b point.");
             }break;
 
