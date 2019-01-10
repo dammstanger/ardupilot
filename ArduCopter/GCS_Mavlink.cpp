@@ -2009,11 +2009,12 @@ uint32_t GCS_MAVLINK_Copter::setSpecialPointInfo(uint8_t type)
 	} else if(3 == type) {
 		copter.beaconParams.bPointLatitude = beaconParams.bPointLatitude;
 		copter.beaconParams.bPointLongitude = beaconParams.bPointLongitude;
-	} else if(1 == type) {
+	} else if((1 == type) || (4 == type)) {
 		copter.beaconParams.breakPointLatitude = beaconParams.breakPointLatitude;
 		copter.beaconParams.breakPointLongitude = beaconParams.breakPointLongitude;
 		copter.beaconParams.breakDirection = beaconParams.breakDirection;
 		copter.beaconParams.seqOfNextWayPoint = beaconParams.seqOfNextWayPoint;
+		copter.beaconParams.breakPointType = type;
 	} else {
 		gcs().send_text(MAV_SEVERITY_CRITICAL, "Get error beacon special point: id %d\n\r", type);
 	}
