@@ -170,7 +170,7 @@ bool Copter::init_arm_motors(const bool arming_from_gcs, const bool do_arming_ch
     }
 
 #if HIL_MODE != HIL_MODE_DISABLED || CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    gcs().send_text(MAV_SEVERITY_INFO, "Arming motors");
+    gcs().send_text(MAV_SEVERITY_INFO, "[15600]Arming motors");
 #endif
 
     // Remember Orientation
@@ -252,7 +252,7 @@ void Copter::init_disarm_motors()
     }
 
 #if HIL_MODE != HIL_MODE_DISABLED || CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    gcs().send_text(MAV_SEVERITY_INFO, "Disarming motors");
+    gcs().send_text(MAV_SEVERITY_INFO, "[15601]Disarming motors");
 #endif
 
     // save compass offsets learned by the EKF if enabled

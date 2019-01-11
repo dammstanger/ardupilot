@@ -256,7 +256,7 @@ void Copter::set_mode_SmartRTL_or_land_with_pause(mode_reason_t reason)
 {
     // attempt to switch to SMART_RTL, if this failed then switch to Land
     if (!set_mode(SMART_RTL, reason)) {
-        gcs().send_text(MAV_SEVERITY_WARNING, "SmartRTL Unavailable, Using Land Mode");
+        gcs().send_text(MAV_SEVERITY_WARNING, "[07401]SmartRTL Unavailable, Using Land Mode");
         set_mode_land_with_pause(reason);
     } else {
         AP_Notify::events.failsafe_mode_change = 1;
@@ -270,7 +270,7 @@ void Copter::set_mode_SmartRTL_or_RTL(mode_reason_t reason)
     // attempt to switch to SmartRTL, if this failed then attempt to RTL
     // if that fails, then land
     if (!set_mode(SMART_RTL, reason)) {
-        gcs().send_text(MAV_SEVERITY_WARNING, "SmartRTL Unavailable, Trying RTL Mode");
+        gcs().send_text(MAV_SEVERITY_WARNING, "[07402]SmartRTL Unavailable, Trying RTL Mode");
         set_mode_RTL_or_land_with_pause(reason);
     } else {
         AP_Notify::events.failsafe_mode_change = 1;

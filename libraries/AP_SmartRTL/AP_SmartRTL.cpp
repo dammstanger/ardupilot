@@ -113,7 +113,7 @@ void AP_SmartRTL::init()
     // check if memory allocation failed
     if (_path == nullptr || _prune.loops == nullptr || _simplify.stack == nullptr) {
         log_action(SRTL_DEACTIVATED_INIT_FAILED);
-        gcs().send_text(MAV_SEVERITY_WARNING, "SmartRTL deactivated: init failed");
+        gcs().send_text(MAV_SEVERITY_WARNING, "[07400]SmartRTL deactivated: init failed");
         free(_path);
         free(_prune.loops);
         free(_simplify.stack);
@@ -234,12 +234,12 @@ void AP_SmartRTL::update(bool position_ok, const Vector3f& current_pos)
             _last_position_save_ms = now;
         } else if (AP_HAL::millis() - _last_position_save_ms > SMARTRTL_TIMEOUT) {
             // deactivate after timeout due to failure to save points to path (most likely due to buffer filling up)
-            deactivate(SRTL_DEACTIVATED_PATH_FULL_TIMEOUT, "buffer full");
+            deactivate(SRTL_DEACTIVATED_PATH_FULL_TIMEOUT, "[07403]buffer full");
         }
     } else {
         // check for timeout due to bad position
         if (AP_HAL::millis() - _last_good_position_ms > SMARTRTL_TIMEOUT) {
-            deactivate(SRTL_DEACTIVATED_BAD_POSITION_TIMEOUT, "bad position");
+            deactivate(SRTL_DEACTIVATED_BAD_POSITION_TIMEOUT, "[07404]bad position");
             return;
         }
     }
@@ -645,7 +645,7 @@ void AP_SmartRTL::remove_points_by_simplify_bitmask()
         _simplify.path_points_completed = _simplify.path_points_count;
     } else {
         // this is an error that should never happen so deactivate
-        deactivate(SRTL_DEACTIVATED_PROGRAM_ERROR, "program error");
+        deactivate(SRTL_DEACTIVATED_PROGRAM_ERROR, "[07405]program error");
     }
 
     _path_sem->give();
@@ -691,7 +691,7 @@ bool AP_SmartRTL::remove_points_by_loops(uint16_t num_points_to_remove)
             removed_points += loop_num_points_to_remove;
         } else {
             // this is an error that should never happen so deactivate
-            deactivate(SRTL_DEACTIVATED_PROGRAM_ERROR, "program error");
+            deactivate(SRTL_DEACTIVATED_PROGRAM_ERROR, "[07405]program error");
             _path_sem->give();
             // we return true so thorough_cleanup does not get stuck
             return true;

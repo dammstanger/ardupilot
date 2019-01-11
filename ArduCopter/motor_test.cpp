@@ -134,7 +134,7 @@ MAV_RESULT Copter::mavlink_motor_test_start(mavlink_channel_t chan, uint8_t moto
     }
     // if test has not started try to start it
     if (!ap.motor_test) {
-        gcs().send_text(MAV_SEVERITY_INFO, "starting motor test");
+        gcs().send_text(MAV_SEVERITY_INFO, "[15602]starting motor test");
 
         /* perform checks that it is ok to start test
            The RC calibrated check can be skipped if direct pwm is
@@ -189,7 +189,7 @@ void Copter::motor_test_stop()
         return;
     }
 
-    gcs().send_text(MAV_SEVERITY_INFO, "finished motor test");    
+    gcs().send_text(MAV_SEVERITY_INFO, "[15603]finished motor test");    
 
     // flag test is complete
     ap.motor_test = false;
