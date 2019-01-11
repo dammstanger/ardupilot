@@ -58,7 +58,7 @@ void Copter::ekf_check()
                 Log_Write_Error(ERROR_SUBSYSTEM_EKFCHECK, ERROR_CODE_EKFCHECK_BAD_VARIANCE);
                 // send message to gcs
                 if ((AP_HAL::millis() - ekf_check_state.last_warn_time) > EKF_CHECK_WARNING_TIME) {
-                    gcs().send_text(MAV_SEVERITY_CRITICAL,"EKF variance");
+                    gcs().send_text(MAV_SEVERITY_CRITICAL,"[03201]EKF variance");
                     ekf_check_state.last_warn_time = AP_HAL::millis();
                 }
                 failsafe_ekf_event();
@@ -194,7 +194,7 @@ void Copter::check_ekf_reset()
         attitude_control->inertial_frame_reset();
         ekf_primary_core = EKF2.getPrimaryCoreIndex();
         Log_Write_Error(ERROR_SUBSYSTEM_EKF_PRIMARY, ekf_primary_core);
-        gcs().send_text(MAV_SEVERITY_WARNING, "EKF primary changed:%d", (unsigned)ekf_primary_core);
+        gcs().send_text(MAV_SEVERITY_WARNING, "[03403]EKF primary changed:%d", (unsigned)ekf_primary_core);
     }
 #endif
 }

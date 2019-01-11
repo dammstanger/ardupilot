@@ -270,7 +270,7 @@ void NavEKF2_core::setAidingMode()
         switch (PV_AidingMode) {
         case AID_NONE:
             // We have ceased aiding
-            gcs().send_text(MAV_SEVERITY_WARNING, "EKF2 IMU%u has stopped aiding",(unsigned)imu_index);
+            gcs().send_text(MAV_SEVERITY_WARNING, "[03400]EKF2 IMU%u has stopped aiding",(unsigned)imu_index);
             // When not aiding, estimate orientation & height fusing synthetic constant position and zero velocity measurement to constrain tilt errors
             posTimeout = true;
             velTimeout = true;            
@@ -304,7 +304,7 @@ void NavEKF2_core::setAidingMode()
             bool canUseExtNav = readyToUseExtNav();
             // We have commenced aiding and GPS usage is allowed
             if (canUseGPS) {
-                gcs().send_text(MAV_SEVERITY_INFO, "EKF2 IMU%u is using GPS",(unsigned)imu_index);
+                gcs().send_text(MAV_SEVERITY_INFO, "[03600]EKF2 IMU%u is using GPS",(unsigned)imu_index);
             }
             posTimeout = false;
             velTimeout = false;

@@ -185,7 +185,7 @@ bool Copter::set_mode(control_mode_t mode, mode_reason_t reason)
 
     Copter::Mode *new_flightmode = mode_from_mode_num(mode);
     if (new_flightmode == nullptr) {
-        gcs().send_text(MAV_SEVERITY_WARNING,"No such mode");
+        gcs().send_text(MAV_SEVERITY_WARNING,"[04400]No such mode");
         Log_Write_Error(ERROR_SUBSYSTEM_FLIGHT_MODE,mode);
         return false;
     }
@@ -196,14 +196,14 @@ bool Copter::set_mode(control_mode_t mode, mode_reason_t reason)
     // do not allow helis to enter a non-manual throttle mode if the
     // rotor runup is not complete
     if (!ignore_checks && !new_flightmode->has_manual_throttle() && !motors->rotor_runup_complete()){
-        gcs().send_text(MAV_SEVERITY_WARNING,"Flight mode change failed");
+        gcs().send_text(MAV_SEVERITY_WARNING,"[04401]Flight mode change failed");
         Log_Write_Error(ERROR_SUBSYSTEM_FLIGHT_MODE,mode);
         return false;
     }
 #endif
 
     if (!new_flightmode->init(ignore_checks)) {
-        gcs().send_text(MAV_SEVERITY_WARNING,"Flight mode change failed");
+        gcs().send_text(MAV_SEVERITY_WARNING,"[04401]Flight mode change failed");
         Log_Write_Error(ERROR_SUBSYSTEM_FLIGHT_MODE,mode);
         return false;
     }

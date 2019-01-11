@@ -77,7 +77,7 @@ bool NavEKF3_core::setup_core(NavEKF3 *_frontend, uint8_t _imu_index, uint8_t _c
                 lastInitFailReport_ms = AP_HAL::millis();
                 // provide an escalating series of messages
                 if (AP_HAL::millis() > 30000) {
-                    gcs().send_text(MAV_SEVERITY_ERROR, "EKF3 waiting for GPS config data");
+                    gcs().send_text(MAV_SEVERITY_ERROR, "[03300]EKF3 waiting for GPS config data");
                 } else if (AP_HAL::millis() > 15000) {
                     gcs().send_text(MAV_SEVERITY_WARNING, "EKF3 waiting for GPS config data");
                 } else  {

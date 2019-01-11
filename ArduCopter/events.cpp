@@ -228,10 +228,10 @@ void Copter::gpsglitch_check()
         ap.gps_glitching = gps_glitching;
         if (gps_glitching) {
             Log_Write_Error(ERROR_SUBSYSTEM_GPS, ERROR_CODE_GPS_GLITCH);
-            gcs().send_text(MAV_SEVERITY_CRITICAL,"GPS Glitch");
+            gcs().send_text(MAV_SEVERITY_CRITICAL,"[18200]GPS Glitch");
         } else {
             Log_Write_Error(ERROR_SUBSYSTEM_GPS, ERROR_CODE_ERROR_RESOLVED);
-            gcs().send_text(MAV_SEVERITY_CRITICAL,"GPS Glitch cleared");
+            gcs().send_text(MAV_SEVERITY_INFO,"[18600]GPS Glitch cleared");
         }
     }
 }
@@ -282,7 +282,7 @@ void Copter::set_mode_Loiter(mode_reason_t reason)
     // attempt to switch to Loiter, if this failed then attempt to RTL
     // if that fails, then land
     if (!set_mode(LOITER, reason)) {
-        gcs().send_text(MAV_SEVERITY_WARNING, "Loiter Unavailable, Trying ALT_HOLD Mode");
+        gcs().send_text(MAV_SEVERITY_WARNING, "[04402]Loiter Unavailable, Trying ALT_HOLD Mode");
         set_mode_ALT_HOLD(reason);
     } else {
         AP_Notify::events.failsafe_mode_change = 1;
@@ -294,7 +294,7 @@ void Copter::set_mode_ALT_HOLD(mode_reason_t reason)
     // attempt to switch to ALT_HOLD
     // if that fails, then land
     if (!set_mode(ALT_HOLD, reason)) {
-        gcs().send_text(MAV_SEVERITY_WARNING, "ALT_HOLD Unavailable, Trying land Mode");
+        gcs().send_text(MAV_SEVERITY_WARNING, "[04403]ALT_HOLD Unavailable, Trying land Mode");
         set_mode_land_with_pause(reason);
     } else {
         AP_Notify::events.failsafe_mode_change = 1;

@@ -630,7 +630,7 @@ bool NavEKF2::InitialiseFilter(void)
 
         // check if there is enough memory to create the EKF cores
         if (hal.util->available_memory() < sizeof(NavEKF2_core)*num_cores + 4096) {
-            gcs().send_text(MAV_SEVERITY_CRITICAL, "NavEKF2: not enough memory");
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "[03200]NavEKF2: not enough memory");
             _enable.set(0);
             return false;
         }
@@ -639,7 +639,7 @@ bool NavEKF2::InitialiseFilter(void)
         core = (NavEKF2_core*)hal.util->malloc_type(sizeof(NavEKF2_core)*num_cores, AP_HAL::Util::MEM_FAST);
         if (core == nullptr) {
             _enable.set(0);
-            gcs().send_text(MAV_SEVERITY_CRITICAL, "NavEKF2: allocation failed");
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "[03200]NavEKF2: allocation failed");
             return false;
         }
         for (uint8_t i = 0; i < num_cores; i++) {

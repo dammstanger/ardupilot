@@ -187,7 +187,7 @@ void DataFlash_File::periodic_1Hz(const uint32_t now)
 {
     if (!io_thread_alive()) {
         if (io_thread_warning_decimation_counter == 0) {
-            gcs().send_text(MAV_SEVERITY_CRITICAL, "No IO Thread Heartbeat (%s)", last_io_operation);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "[17200]No IO Thread Heartbeat (%s)", last_io_operation);
         }
         if (io_thread_warning_decimation_counter++ > 57) {
             io_thread_warning_decimation_counter = 0;

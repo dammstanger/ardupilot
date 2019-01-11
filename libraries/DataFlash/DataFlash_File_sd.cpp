@@ -85,7 +85,7 @@ void DataFlash_File::Init()
         if (!SD.mkdir(_log_directory)) {
             
             printf("Failed to create log directory %s: %s\n", _log_directory, SD.strError(SD.lastError));
-            gcs().send_text(MAV_SEVERITY_WARNING,"Failed to create log directory %s: %s", _log_directory, SD.strError(SD.lastError));
+            gcs().send_text(MAV_SEVERITY_WARNING,"[17400]Failed to create log directory %s: %s", _log_directory, SD.strError(SD.lastError));
             _log_directory="0:";
         }
     }
@@ -136,7 +136,7 @@ void DataFlash_File::periodic_1Hz(const uint32_t now)
     if (!(_write_fd) || !_initialised || _open_error || _busy) return; // too early
 
     if (!io_thread_alive()) {
-        gcs().send_text(MAV_SEVERITY_WARNING, "No IO Thread Heartbeat");
+        gcs().send_text(MAV_SEVERITY_WARNING, "[17401]No IO Thread Heartbeat");
         // If you try to close the file here then it will almost
         // certainly block.  Since this is the main thread, this is
         // likely to cause a crash.
@@ -304,7 +304,7 @@ void DataFlash_File::Prep_MinSpace()
 #elif defined(BOARD_SDCARD_CS_PIN)
                 if(hal_param_helper->_sd_format){
                     printf("error getting free space, formatting!\n");
-                    gcs().send_text(MAV_SEVERITY_WARNING,"error getting free space, formatting!");
+                    gcs().send_text(MAV_SEVERITY_WARNING,"[17402]error getting free space, formatting!");
                     SD.format(_log_directory);
                     return;
                 }
@@ -878,12 +878,12 @@ void DataFlash_File::_io_timer(void)
     if (nwritten <= 0) {
         FRESULT err=SD.lastError;
         printf("\nLog write %ld bytes fails: %s\n",nbytes, SD.strError(err));
-        gcs().send_text(MAV_SEVERITY_WARNING,"Log write %ld bytes fails: %s",nbytes, SD.strError(err));
+        gcs().send_text(MAV_SEVERITY_WARNING,"[17403]Log write %ld bytes fails: %s",nbytes, SD.strError(err));
 //        stop_logging();
         _write_fd.close();
 #if defined(BOARD_DATAFLASH_FATFS)
         if(FR_INT_ERR == err || FR_NO_FILESYSTEM == err) { // internal error - bad filesystem
-            gcs().send_text(MAV_SEVERITY_INFO, "Formatting DataFlash, please wait");
+            gcs().send_text(MAV_SEVERITY_INFO, "[17600]Formatting DataFlash, please wait");
             uint32_t t=AP_HAL::millis();            
             _busy = true; // format requires a long time and 1s task will kill process
             SD.format(_log_directory);
@@ -902,7 +902,7 @@ void DataFlash_File::_io_timer(void)
         } else 
 #else
         if(FR_INT_ERR == err || FR_NO_FILESYSTEM == err || FR_INVALID_OBJECT == err) { // internal error - bad filesystem
-            gcs().send_text(MAV_SEVERITY_INFO, "logging cancelled");
+            gcs().send_text(MAV_SEVERITY_INFO, "[17601]logging cancelled");
             _initialised = false;
             _open_error = true;
         } else 

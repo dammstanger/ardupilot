@@ -45,7 +45,7 @@ void Copter::crash_check()
         // log an error in the dataflash
         Log_Write_Error(ERROR_SUBSYSTEM_CRASH_CHECK, ERROR_CODE_CRASH_CHECK_CRASH);
         // send message to gcs
-        gcs().send_text(MAV_SEVERITY_EMERGENCY,"Crash: Disarming");
+        gcs().send_text(MAV_SEVERITY_EMERGENCY,"[16000]Crash: Disarming");
         // disarm motors
         init_disarm_motors();
     }

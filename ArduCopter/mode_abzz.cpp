@@ -40,7 +40,7 @@ bool Copter::ModeABZz::init(bool ignore_checks)
                 gcs().send_text(MAV_SEVERITY_ERROR, "[05304]ABZZ: need shift direction.");
                 break;
             case GET_AB_BEAR_REV:
-                gcs().send_text(MAV_SEVERITY_ERROR, "[0530]ABZZ: need bear rev to recover.");
+                gcs().send_text(MAV_SEVERITY_ERROR, "[05305]ABZZ: need bear rev to recover.");
                 break;
 
             default:

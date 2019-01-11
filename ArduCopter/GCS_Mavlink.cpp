@@ -384,7 +384,7 @@ bool GCS_MAVLINK_Copter::try_send_message(enum ap_message id)
             0,
             0,
             0, 0, 0, 0, 0, 0);
-		gcs().send_text(MAV_SEVERITY_CRITICAL, "beacon complete work send (cmd)\n\r"); 
+		gcs().send_text(MAV_SEVERITY_CRITICAL, "[09200]beacon complete work send (cmd)\n\r"); 
 		break;
 
     case MSG_BEACON_A_POINT:
@@ -1033,10 +1033,10 @@ void GCS_MAVLINK_Copter::handleMessage(mavlink_message_t* msg)
 		
                     copter.mission.start_or_resume();
 
-					gcs().send_text(MAV_SEVERITY_CRITICAL, "gcs command start mission 1 \n\r");
+					gcs().send_text(MAV_SEVERITY_CRITICAL, "[09201]gcs command start mission 1 \n\r");
                 }
 
-				gcs().send_text(MAV_SEVERITY_CRITICAL, "gcs command start mission 2 \n\r");
+				gcs().send_text(MAV_SEVERITY_CRITICAL, "[09201]gcs command start mission 2 \n\r");
                 result = MAV_RESULT_ACCEPTED;
             }
             break;
@@ -1881,7 +1881,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_get_point_ab(const mavlink_command
 #if MODE_ABZZ_ENABLED == ENABLED
     if(copter.flightmode == &copter.mode_loiter) {
         if(!copter.motors->armed() || copter.ap.land_complete){
-             gcs().send_text(MAV_SEVERITY_ERROR, "take off first.");
+             gcs().send_text(MAV_SEVERITY_ERROR, "[09300]take off first.");
              return MAV_RESULT_DENIED;
         }
 
@@ -1907,7 +1907,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_get_point_ab(const mavlink_command
 
         return MAV_RESULT_ACCEPTED;
     }else{
-        gcs().send_text(MAV_SEVERITY_ERROR, "Not in ab setting mode");
+        gcs().send_text(MAV_SEVERITY_ERROR, "[09301]Not in ab setting mode");
         return MAV_RESULT_DENIED;
     }
 #else
@@ -1923,11 +1923,11 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_clear_point_ab()
         if(copter.mode_abzz.clear_ab_point()){
             return MAV_RESULT_ACCEPTED;
         }else{
-            gcs().send_text(MAV_SEVERITY_ERROR, "failed to clear AB point");
+            gcs().send_text(MAV_SEVERITY_ERROR, "[09302]failed to clear AB point");
             return MAV_RESULT_DENIED;                
         }
     }else{
-        gcs().send_text(MAV_SEVERITY_ERROR, "Not in ab setting mode");
+        gcs().send_text(MAV_SEVERITY_ERROR, "[09301]Not in ab setting mode");
         return MAV_RESULT_DENIED;
     }
 #else
@@ -2043,7 +2043,7 @@ uint32_t GCS_MAVLINK_Copter::setSpecialPointInfo(uint8_t type)
 		copter.beaconParams.seqOfNextWayPoint = beaconParams.seqOfNextWayPoint;
 		copter.beaconParams.breakPointType = type;
 	} else {
-		gcs().send_text(MAV_SEVERITY_CRITICAL, "Get error beacon special point: id %d\n\r", type);
+		gcs().send_text(MAV_SEVERITY_CRITICAL, "[09202]Get error beacon special point: id %d\n\r", type);
             return 1;
 	}
     //handle msg for abzz mode
@@ -2063,7 +2063,7 @@ uint32_t GCS_MAVLINK_Copter::sendSpecialPointInfo(uint8_t type)
 	} else if((1 == type) || (4 == type)) {
 		mavlink_msg_special_point_info_send(chan, type, copter.beaconParams.breakDirection, copter.beaconParams.seqOfNextWayPoint, copter.beaconParams.breakPointLatitude, copter.beaconParams.breakPointLongitude);
 	} else {
-		gcs().send_text(MAV_SEVERITY_CRITICAL, "Get error beacon special point: id %d\n\r", type);
+		gcs().send_text(MAV_SEVERITY_CRITICAL, "[09203]Get error beacon special point: id %d\n\r", type);
 	}
 
 	return 0;

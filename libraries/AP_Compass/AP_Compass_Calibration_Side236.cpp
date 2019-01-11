@@ -204,8 +204,8 @@ Compass::compass_cal_update()
         cancel_calibration_all();
         _detect_sta = CAL_STA_STANBY;
         if(detect_failure)
-            gcs().send_text(MAV_SEVERITY_ERROR, "Magcalib: orien/rotat detect failed.");
-        else gcs().send_text(MAV_SEVERITY_ERROR, "Magcalib: calib timeout.");
+            gcs().send_text(MAV_SEVERITY_ERROR, "[13300]Magcalib: orien/rotat detect failed.");
+        else gcs().send_text(MAV_SEVERITY_ERROR, "[13301]Magcalib: calib timeout.");
     }
 
     //STEP4 update every mag
@@ -216,7 +216,7 @@ Compass::compass_cal_update()
         if (failure || _calibrator[i].check_for_timeout()) {
             AP_Notify::events.compass_cal_failed = 1;
             cancel_calibration_all();
-            gcs().send_text(MAV_SEVERITY_ERROR, "Magcalib: mag %u calib failed.",i);
+            gcs().send_text(MAV_SEVERITY_ERROR, "[13302]Magcalib: mag %u calib failed.",i);
         }
 
         if (_calibrator[i].running()) {
