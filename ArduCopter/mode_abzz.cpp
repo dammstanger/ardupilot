@@ -613,9 +613,14 @@ void Copter::ModeABZz::save_ab_shiftdir_RC()
 
 void Copter::ModeABZz::set_ab_bearing_reverse_flag(uint8_t flag)
 {
-    if(flag) 
-        _flags.ab_bearing_reverse = true;
-    else _flags.ab_bearing_reverse = false;
+    if( _sta_absetting == GET_AB_BEAR_REV){
+        if(flag)
+            _flags.ab_bearing_reverse = true;
+        else _flags.ab_bearing_reverse = false;
+        _sta_absetting = AB_POINT_CMPLT;
+    }else{
+        gcs().send_text(MAV_SEVERITY_ERROR, "[05316]ABZZ: set bearing reverse flag failed, need precondition.");
+    }
 }
 
 bool Copter::ModeABZz::get_ab_bearing_reverse_flag()
