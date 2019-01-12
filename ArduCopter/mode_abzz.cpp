@@ -7,7 +7,7 @@
  */
 
 #define ABZZ_WP_RADIUS_CM   300
-#define ABZZ_YAW_LOOK_DISTANCE_MIN_CM   800
+#define ABZZ_YAW_LOOK_DISTANCE_MIN_CM   300
 
 
 
@@ -50,10 +50,7 @@ bool Copter::ModeABZz::init(bool ignore_checks)
         return false;
     }
 
-    // TODO: we also need to check if there has a valid break point
     if(!check_ab_point_validity()) return false;
-
-    gcs().send_text(MAV_SEVERITY_INFO, "A:=%d, B=%d, cnt=%d", _point_a.lng,_point_b.lng, _shift_count);
 
     //if break point is valid means we should continue the task
     if(check_break_point_validity()){
@@ -152,68 +149,79 @@ void Copter::ModeABZz::update_abwp_sta()
         handle_RC_exit_ab_mode();
     break;
 
-    case Start:{
-            //now we can start auto flight
-            gcs().send_text(MAV_SEVERITY_INFO, "[05600]ab start");
+    case Start:
+        //now we can start auto flight
+        gcs().send_text(MAV_SEVERITY_INFO, "[05600]ab start");
 
-            //
-            if(!generate_next_abline()){
-                brake_and_exit(false);
-                _sta_abzz = StandBy;
-                _sta_abzz_last = Start;
-                return ;
+        //
+        if(!generate_next_abline()){
+            brake_and_exit(false);
+            _sta_abzz = StandBy;
+            _sta_abzz_last = Start;
+            return ;
+        }
+
+        if (wp_start(_point_shift_a)){
+            //update loiter timer with destination distance
+            if(wp_distance()< ABZZ_WP_RADIUS_CM){
+                loiter_time_max = 2;
             }
+            else{
+                loiter_time_max = 1;
+            }
+            loiter_time = 0;
 
-            if (wp_start(_point_shift_a)){
-                //update loiter timer with destination distance
-                if(wp_distance()< ABZZ_WP_RADIUS_CM){
-                    loiter_time_max = 2;
-                }
-                else{
-                    loiter_time_max = 1;
-                }
-                loiter_time = 0;
-
+            if(wp_distance()<=ABZZ_YAW_LOOK_DISTANCE_MIN_CM){
+                //hold yaw
+                auto_yaw.set_mode(AUTO_YAW_HOLD);
+            }else{
                 //update yaw
                 auto_yaw.set_fixed_yaw(wp_bearing()/100.0f, 20.0f, 0, false);
-                
-                _sta_abzz = GotoWork;
-                _mode = Abzz_WP;
-            }else{
-                gcs().send_text(MAV_SEVERITY_ERROR, "[05306]ABZZ: terrain follow failed.");
-                brake_and_exit(true);
-                _sta_abzz = StandBy;
             }
-            _sta_abzz_last = Start;
+            _sta_abzz = GotoWork;
+            _mode = Abzz_WP;
+        }else{
+            gcs().send_text(MAV_SEVERITY_ERROR, "[05306]ABZZ: terrain follow failed.");
+            brake_and_exit(true);
+            _sta_abzz = StandBy;
         }
-        break;
+        _sta_abzz_last = Start;
+    break;
 
     case Resume:{
-            //set start point to last break point
-            if (wp_start(_point_break)){
-                //update loiter timer with destination distance
-                if(wp_distance()< ABZZ_WP_RADIUS_CM){
-                    loiter_time_max = 2;
-                }
-                else{
-                    loiter_time_max = 1;
-                }
-                loiter_time = 0;
+        //
+        generate_abline(_shift_count);
 
+        //set start point to last break point
+        if (wp_start(_point_break)){
+            //update loiter timer with destination distance
+            if(wp_distance()< ABZZ_WP_RADIUS_CM){
+                loiter_time_max = 2;
+            }
+            else{
+                loiter_time_max = 1;
+            }
+            loiter_time = 0;
+
+            if(wp_distance()<=ABZZ_YAW_LOOK_DISTANCE_MIN_CM){
+                //hold yaw
+                auto_yaw.set_mode(AUTO_YAW_HOLD);
+            }else{
                 //update yaw
                 auto_yaw.set_fixed_yaw(wp_bearing()/100.0f, 20.0f, 0, false);
-
-                _sta_abzz = GotoWork;
-                _mode = Abzz_WP;
-            }else{
-                gcs().send_text(MAV_SEVERITY_ERROR, "[05306]ABZZ: terrain follow failed.");
-                brake_and_exit(true);
-                _sta_abzz = StandBy;
             }
-            gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: Resume.");
-            _sta_abzz_last = Resume;
+
+            _sta_abzz = GotoWork;
+            _mode = Abzz_WP;
+        }else{
+            gcs().send_text(MAV_SEVERITY_ERROR, "[05306]ABZZ: terrain follow failed.");
+            brake_and_exit(true);
+            _sta_abzz = StandBy;
         }
-        break;
+        gcs().send_text(MAV_SEVERITY_DEBUG, "ABZZ: Resume.");
+        _sta_abzz_last = Resume;
+        }
+    break;
 
     case GotoWork:
          if(verify_nav_wp()){
@@ -227,8 +235,13 @@ void Copter::ModeABZz::update_abwp_sta()
                 }
                 loiter_time = 0;
 
-                //update yaw
-                auto_yaw.set_fixed_yaw(_ab_bearing_deg, 20.0f, 0, false);
+                if(wp_distance()<=ABZZ_YAW_LOOK_DISTANCE_MIN_CM){
+                    //hold yaw
+                    auto_yaw.set_mode(AUTO_YAW_HOLD);
+                }else{
+                    //update yaw
+                    auto_yaw.set_fixed_yaw(_ab_bearing_deg, 20.0f, 0, false);
+                }
 
                 _sta_abzz = AToB;
                 //enable sprayer
@@ -247,8 +260,7 @@ void Copter::ModeABZz::update_abwp_sta()
                  _sta_abzz_last = GotoWork;
             }
          }
-
-         break;
+    break;
 
     case AToB:
         //destination is point B
