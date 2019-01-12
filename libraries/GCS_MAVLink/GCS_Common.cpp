@@ -2324,6 +2324,7 @@ void GCS_MAVLINK::handle_beacon_message(const mavlink_message_t* msg)
 		switch(packet1.point_type){
 			
 		case 1: // Break point.
+		case 4:
 			beaconParams.breakPointLatitude = packet1.latitude;
 			beaconParams.breakPointLongitude = packet1.longitude;
 			beaconParams.seqOfNextWayPoint = packet1.seq;

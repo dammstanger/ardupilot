@@ -1226,7 +1226,7 @@ void Copter::ModeABZz::handle_set_pecial_point_Info(uint8_t info_type, BeaconPar
     if(copter.flightmode == &copter.mode_loiter){
         switch(info_type){
             case 4:{
-                Location_Class loc_break(param.aPointLatitude, param.aPointLongitude, param.height, Location_Class::ALT_FRAME_ABOVE_TERRAIN);
+                Location_Class loc_break(param.breakPointLatitude, param.breakPointLongitude, param.height, Location_Class::ALT_FRAME_ABOVE_TERRAIN);
                 set_breakpoint(loc_break);
                 set_ab_bearing_reverse_flag(param.breakDirection);
                 gcs().send_text(MAV_SEVERITY_DEBUG, "set break point.");
