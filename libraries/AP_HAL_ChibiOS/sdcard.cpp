@@ -80,8 +80,13 @@ bool sdcard_init()
         }
         printf("Successfully mounted SDCard (slowdown=%u)\n", (unsigned)sd_slowdown);
 
+#if defined(HAL_CHIBIOS_ARCH_ST3_0) && (HAL_CHIBIOS_ARCH_ST3_0==1)
+        //Create ST3 Directory
+        AP::FS().mkdir("/ST3");
+#else
         // Create APM Directory if needed
         AP::FS().mkdir("/APM");
+#endif
         sdcard_running = true;
         return true;
     }

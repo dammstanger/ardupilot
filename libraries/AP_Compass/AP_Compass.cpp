@@ -754,7 +754,8 @@ void Compass::_probe_external_i2c_compasses(void)
 
     // IST8310 on external and internal bus
     if (AP_BoardConfig::get_board_type() != AP_BoardConfig::PX4_BOARD_FMUV5 &&
-        AP_BoardConfig::get_board_type() != AP_BoardConfig::PX4_BOARD_FMUV6) {
+        AP_BoardConfig::get_board_type() != AP_BoardConfig::PX4_BOARD_FMUV6 &&
+        AP_BoardConfig::get_board_type() != AP_BoardConfig::PX4_BOARD_ST3_0) {
         enum Rotation default_rotation;
 
         if (AP_BoardConfig::get_board_type() == AP_BoardConfig::PX4_BOARD_AEROFC) {
@@ -845,6 +846,7 @@ void Compass::_detect_backends(void)
     case AP_BoardConfig::PX4_BOARD_MINDPXV2:
     case AP_BoardConfig::PX4_BOARD_FMUV5:
     case AP_BoardConfig::PX4_BOARD_FMUV6:
+    case AP_BoardConfig::PX4_BOARD_ST3_0:
     case AP_BoardConfig::PX4_BOARD_PIXHAWK_PRO:
     case AP_BoardConfig::PX4_BOARD_AEROFC:
         _probe_external_i2c_compasses();

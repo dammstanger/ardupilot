@@ -33,7 +33,7 @@
 #include <ctype.h>
 #include <stdint.h>
 #include <stdlib.h>
-
+#include <GCS_MAVLink/GCS.h>
 #include "AP_GPS_NMEA.h"
 
 extern const AP_HAL::HAL& hal;
@@ -457,4 +457,18 @@ AP_GPS_NMEA::_detect(struct NMEA_detect_state &state, uint8_t data)
 		break;
     }
     return false;
+}
+
+void
+AP_GPS_NMEA::inject_data(const uint8_t *data, uint16_t len)
+{
+    if (port->txspace() > len) {
+        last_injected_data_ms = AP_HAL::millis();
+        port->write(data, len);
+        if(len>180){
+            gcs().send_text(MAV_SEVERITY_INFO, "GPS NMEA RTCM rev len=%d",len);
+        }
+    } else {
+        gcs().send_text(MAV_SEVERITY_INFO, "GPS NMEA RTCM error");
+    }
 }

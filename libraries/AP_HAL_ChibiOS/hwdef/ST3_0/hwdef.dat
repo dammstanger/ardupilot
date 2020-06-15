@@ -1,0 +1,227 @@
+# hw definition file for processing by chibios_hwdef.py
+# for ST3_0 hardware
+
+# MCU class and specific type. It is a F765, which is the same as F767
+# but without the TFT interface
+MCU STM32F7xx STM32F767xx
+
+# crystal frequency
+OSCILLATOR_HZ 16000000
+
+define STM32_LSECLK 32768U
+define STM32_LSEDRV (3U << 3U)
+define STM32_PLLSRC STM32_PLLSRC_HSE
+define STM32_PLLM_VALUE 8
+define STM32_PLLN_VALUE 216
+define STM32_PLLP_VALUE 2
+define STM32_PLLQ_VALUE 9
+
+define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_CHIBIOS_ST3_0
+define HAL_CHIBIOS_ARCH_ST3_0 1
+
+# board ID for firmware load
+APJ_BOARD_ID 300
+
+FLASH_RESERVE_START_KB 32
+
+# board voltage
+STM32_VDD 330U
+
+# flash size
+FLASH_SIZE_KB 2048
+
+env OPTIMIZE -O2
+
+# order of UARTs (and USB)
+UART_ORDER OTG1 USART1 USART2 USART3 UART4 USART6 UART7
+
+# now we define the pins that USB is connected on
+PA11 OTG_FS_DM OTG1
+PA12 OTG_FS_DP OTG1
+
+# these are the pins for SWD debugging with a STlinkv2 or black-magic probe
+PA13 JTMS-SWDIO SWD
+PA14 JTCK-SWCLK SWD
+
+# SPI1 - internal sensors
+PG11 SPI1_SCK SPI1
+PA6 SPI1_MISO SPI1
+PD7 SPI1_MOSI SPI1
+
+# SPI2 - FRAM
+PD3 SPI2_SCK SPI2
+PC2 SPI2_MISO SPI2
+PC3 SPI2_MOSI SPI2
+
+# SPI4 - sensors2
+PE2 SPI4_SCK SPI4
+PE13 SPI4_MISO SPI4
+PE6 SPI4_MOSI SPI4
+
+# sensor CS
+PF10 MS5611_CS CS
+PF2  ICM20689_CS CS SPEED_VERYLOW
+PF3  ADIS16470_CS CS SPEED_VERYLOW
+PF5  FRAM_CS CS SPEED_VERYLOW
+
+# I2C buses
+
+PB8 I2C1_SCL I2C1
+PB9 I2C1_SDA I2C1
+
+PF1 I2C2_SCL I2C2
+PF0 I2C2_SDA I2C2
+
+# PF14 I2C4_SCL I2C4
+# PF15 I2C4_SDA I2C4
+
+# order of I2C buses
+# I2C_ORDER I2C3 I2C1 I2C2 I2C4
+# ======we need to consider which port tobe used to prevent pin confication====
+I2C_ORDER I2C1 I2C2
+
+# enable pins
+#PE3 VDD_3V3_SENSORS_EN OUTPUT LOW
+
+# start peripheral power off, then enable after init
+# this prevents a problem with radios that use RTS for
+# bootloader hold
+# PG5  VDD_5V_RC_EN OUTPUT HIGH
+PG7  VDD_3V3_SD_CARD_EN OUTPUT HIGH
+
+# drdy pins
+# =====TODO we need to define ADIS16470 DRDY pin
+PB5  DRDY1_ICM20689 INPUT
+PC5  DRDY2_ADIS16470 INPUT
+# UARTs
+
+# USART2 is telem1
+PD6 USART2_RX USART2
+PD5 USART2_TX USART2
+
+# USART1 is GPS1
+PB7 USART1_RX USART1 NODMA
+PB6 USART1_TX USART1 NODMA
+
+# USART3 is telem2
+PD9 USART3_RX USART3
+PD8 USART3_TX USART3
+
+# UART4 GPS2
+PA1 UART4_RX UART4 NODMA
+PA0 UART4_TX UART4 NODMA
+
+# USART6 is telem3
+PG9 USART6_RX USART6 NODMA
+PG14 USART6_TX USART6 NODMA
+
+# UART7 is debug
+PF6 UART7_RX UART7 NODMA
+PE8 UART7_TX UART7 NODMA
+
+# No IOMCU
+# PE0 UART8_RX UART8
+# PE1 UART8_TX UART8
+
+# No IOMCU
+# IOMCU_UART UART8
+
+# enable RTSCTS support
+# define AP_FEATURE_RTSCTS 1
+
+# enable SBUS_OUT on IOMCU (if you have an IOMCU)
+# define AP_FEATURE_SBUS_OUT 1
+
+# PWM AUX channels
+PE14 TIM1_CH4 TIM1 PWM(1) GPIO(50)
+PA10 TIM1_CH3 TIM1 PWM(2) GPIO(51)
+PE11 TIM1_CH2 TIM1 PWM(3) GPIO(52)
+PE9  TIM1_CH1 TIM1 PWM(4) GPIO(53)
+PD13 TIM4_CH2 TIM4 PWM(5) GPIO(54)
+PD14 TIM4_CH3 TIM4 PWM(6) GPIO(55)
+PA5  TIM2_CH1 TIM2 PWM(7) GPIO(56)
+PB3  TIM2_CH2 TIM2 PWM(8) GPIO(57)
+PB11 TIM2_CH4 TIM2 PWM(9) GPIO(58)
+# we need to disable DMA on the last 2 FMU channels
+# as timer 12 does not have a TIMn_UP DMA option
+# ========TODO we need to find aproporiate timer for pwm channel=============
+PB14 TIM12_CH1 TIM12 PWM(10) GPIO(59) NODMA
+PB15 TIM12_CH2 TIM12 PWM(11) GPIO(60) NODMA
+PE5 TIM9_CH1 TIM9 PWM(12) GPIO(61) NODMA
+
+define BOARD_PWM_COUNT_DEFAULT 12
+
+# ========
+# we shift the system timer to TIM5 to allow
+# us to use TIM2 for extra PWM outputs
+STM32_ST_USE_TIMER 5
+
+# RCInput on the PPM pin, for all protocols
+# ========= TODO we need to finde another pin===========
+PC6 TIM8_CH1 TIM8 RCININT PULLUP LOW
+
+
+# analog in
+PA2 BATT2_VOLTAGE_SENS ADC1 SCALE(1)
+PA3 BATT_VOLTAGE_SENS ADC1 SCALE(1)
+
+# setup scaling defaults for PixHackV5 power brick
+define HAL_BATT_VOLT_SCALE 18.182
+define HAL_BATT_CURR_SCALE 18.182
+define HAL_BATT_VOLT_PIN 2
+define HAL_BATT_CURR_PIN 3
+define HAL_BATT2_VOLT_PIN 2
+define HAL_BATT2_CURR_PIN 3
+
+# CAN bus
+PD0  CAN1_RX CAN1
+PD1  CAN1_TX CAN1
+
+#PB12 CAN2_RX CAN2
+#PB13 CAN2_TX CAN2
+
+
+# SPI devices TODO ==============add ADIS16470 but not get involved first===================
+SPIDEV ms5611         SPI4 DEVID1  MS5611_CS    MODE3 20*MHZ 20*MHZ
+SPIDEV icm20689       SPI1 DEVID1  ICM20689_CS  MODE3  2*MHZ  8*MHZ
+# set speed according to ADIS16470
+SPIDEV adis16470      SPI1 DEVID2  ADIS16470_CS MODE3  2*MHZ  8*MHZ
+SPIDEV ramtron        SPI2 DEVID1  FRAM_CS      MODE3  8*MHZ  8*MHZ 
+
+define HAL_DEFAULT_INS_FAST_SAMPLE 1
+
+# microSD support
+PC8 SDMMC_D0 SDMMC1
+PC9 SDMMC_D1 SDMMC1
+PC10 SDMMC_D2 SDMMC1
+PC11 SDMMC_D3 SDMMC1
+PC12 SDMMC_CK SDMMC1
+PD2 SDMMC_CMD SDMMC1
+PB1 LED_RED OUTPUT OPENDRAIN GPIO(90)
+PB0 LED_GREEN OUTPUT GPIO(91) LOW
+# enable RAMTROM parameter storage
+define HAL_STORAGE_SIZE 16384
+define HAL_WITH_RAMTRON 1
+
+# one baro
+BARO MS56XX SPI:ms5611
+
+define HAL_COMPASS_DEFAULT HAL_COMPASS_NONE
+define HAL_COMPASS_AUTO_ROT_DEFAULT 2
+
+DMA_PRIORITY SDMMC* UART8* ADC* SPI* TIM*
+
+#define CH_DBG_ENABLE_ASSERTS TRUE
+#define CH_DBG_ENABLE_CHECKS TRUE
+#define CH_DBG_SYSTEM_STATE_CHECK TRUE
+#define CH_DBG_ENABLE_STACK_CHECK TRUE
+
+# define HAL_SPI_CHECK_CLOCK_FREQ 1
+
+# enable FAT filesystem support (needs a microSD defined via SDMMC)
+define HAL_OS_FATFS_IO 1
+
+define HAL_BOARD_LOG_DIRECTORY "/ST3/LOGS"
+define HAL_BOARD_TERRAIN_DIRECTORY "/ST3/TERRAIN"
+
+ROMFS io_firmware.bin Tools/IO_Firmware/iofirmware_lowpolh.bin

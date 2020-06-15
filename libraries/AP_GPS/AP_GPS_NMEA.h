@@ -65,6 +65,8 @@ public:
 
     const char *name() const override { return "NMEA"; }
 
+    void inject_data(const uint8_t *data, uint16_t len);
+
 private:
     /// Coding for the GPS sentences that the parser handles
     enum _sentence_types {      //there are some more than 10 fields in some sentences , thus we have to increase these value.
@@ -154,6 +156,8 @@ private:
     //@}
 
     static const char _initialisation_blob[];
+
+    uint32_t last_injected_data_ms = 0;
 };
 
 #define AP_GPS_NMEA_HEMISPHERE_INIT_STRING \
