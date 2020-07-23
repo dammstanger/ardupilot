@@ -55,6 +55,9 @@ bool ModeGuided::do_user_takeoff_start(float final_alt_above_home)
     Location target_loc = copter.current_loc;
     target_loc.set_alt_cm(final_alt_above_home, Location::AltFrame::ABOVE_HOME);
 
+	pos_control->set_max_speed_z(40, 40);
+	pos_control->set_max_accel_z(30);
+
     if (!wp_nav->set_wp_destination(target_loc)) {
         // failure to set destination can only be because of missing terrain data
         AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_SET_DESTINATION);
