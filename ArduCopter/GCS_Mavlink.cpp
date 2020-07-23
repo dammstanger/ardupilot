@@ -393,11 +393,11 @@ AP_GROUPEND
 static const ap_message STREAM_RAW_SENSORS_msgs[] = {
     MSG_RAW_IMU,
     MSG_SCALED_IMU2,
-    MSG_SCALED_IMU3,
+//    MSG_SCALED_IMU3,
     MSG_SCALED_PRESSURE,
-    MSG_SCALED_PRESSURE2,
-    MSG_SCALED_PRESSURE3,
-    MSG_SENSOR_OFFSETS
+//    MSG_SCALED_PRESSURE2,
+//    MSG_SCALED_PRESSURE3,
+//    MSG_SENSOR_OFFSETS
 };
 static const ap_message STREAM_EXTENDED_STATUS_msgs[] = {
     MSG_SYS_STATUS,
@@ -405,9 +405,9 @@ static const ap_message STREAM_EXTENDED_STATUS_msgs[] = {
     MSG_MEMINFO,
     MSG_CURRENT_WAYPOINT, // MISSION_CURRENT
     MSG_GPS_RAW,
-    MSG_GPS_RTK,
+//    MSG_GPS_RTK,
     MSG_GPS2_RAW,
-    MSG_GPS2_RTK,
+//    MSG_GPS2_RTK,
     MSG_NAV_CONTROLLER_OUTPUT,
     MSG_FENCE_STATUS,
     MSG_POSITION_TARGET_GLOBAL_INT,
@@ -632,10 +632,13 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
         // param7 : altitude [metres]
 
         float takeoff_alt = packet.param7 * 100;      // Convert m to cm
+//execute on delay
+//        if (!copter.flightmode->do_user_takeoff(takeoff_alt, is_zero(packet.param3))) {
+//            return MAV_RESULT_FAILED;
+//        }
 
-        if (!copter.flightmode->do_user_takeoff(takeoff_alt, is_zero(packet.param3))) {
-            return MAV_RESULT_FAILED;
-        }
+        copter.delay_exec_gcs_takeoff_init(takeoff_alt, is_zero(packet.param3));
+
         return MAV_RESULT_ACCEPTED;
     }
 

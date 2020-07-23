@@ -244,6 +244,13 @@ public:
     void loop() override;
 
 private:
+
+    bool delay_takeoff_flag;
+    bool delay_takeoff_must_navigate;
+    float delay_takeoff_alt;
+    void delay_exec_gcs_takeoff_init(float takeoff_alt, bool must_navigate);
+    void delay_exec_gcs_takeoff(void);
+
     static const AP_FWVersion fwver;
 
     // key aircraft parameters passed to multiple libraries

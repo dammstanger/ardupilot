@@ -432,6 +432,30 @@ void Copter::three_hz_loop()
 
     // update ch6 in flight tuning
     tuning();
+
+    //takeoff delay
+    delay_exec_gcs_takeoff();
+}
+
+void Copter::delay_exec_gcs_takeoff_init(float takeoff_alt, bool must_navigate)
+{
+    delay_takeoff_flag = true;
+    delay_takeoff_must_navigate = must_navigate;
+    delay_takeoff_alt = takeoff_alt;
+}
+
+void Copter::delay_exec_gcs_takeoff(void)
+{
+    static int count = 0;
+
+    if (true == delay_takeoff_flag) {
+        if (count++ > 15) {     //333ms *15 = 5s
+            copter.flightmode->do_user_takeoff(delay_takeoff_alt, delay_takeoff_must_navigate);
+            delay_takeoff_flag = false;
+        }
+    } else {
+        count = 0;
+    }
 }
 
 // one_hz_loop - runs at 1Hz
