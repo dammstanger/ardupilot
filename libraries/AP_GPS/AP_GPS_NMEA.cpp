@@ -29,7 +29,7 @@
 ///
 
 #include <AP_Common/AP_Common.h>
-
+#include <GCS_MAVLink/GCS.h>
 #include <ctype.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -459,16 +459,26 @@ AP_GPS_NMEA::_detect(struct NMEA_detect_state &state, uint8_t data)
     return false;
 }
 
+#define RTCM_DBG 1
 void
 AP_GPS_NMEA::inject_data(const uint8_t *data, uint16_t len)
 {
     if (port->txspace() > len) {
-        last_injected_data_ms = AP_HAL::millis();
-        port->write(data, len);
-        if(len>180){
-            gcs().send_text(MAV_SEVERITY_INFO, "GPS NMEA RTCM rev len=%d",len);
+        uint32_t tnow = AP_HAL::millis();
+
+        uint32_t delta = tnow - last_injected_data_ms;
+        if(delta > 1500) {
+            gcs().send_text(MAV_SEVERITY_INFO, "RTCM delay %d ms",delta);
         }
+        last_injected_data_ms = tnow;
+
+#if RTCM_DBG
+        if(len>180){
+            gcs().send_text(MAV_SEVERITY_INFO, "RTCM rev len=%d",len);
+	    }
+#endif
+        port->write(data, len);
     } else {
         gcs().send_text(MAV_SEVERITY_INFO, "GPS NMEA RTCM error");
-    }
+	}
 }
