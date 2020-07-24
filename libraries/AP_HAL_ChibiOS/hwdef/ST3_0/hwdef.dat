@@ -206,6 +206,11 @@ define HAL_WITH_RAMTRON 1
 # one baro
 BARO MS56XX SPI:ms5611
 
+# probe external I2C compasses plus some internal IST8310
+# we also probe some external IST8310 with a non-standard orientation
+define HAL_PROBE_EXTERNAL_I2C_COMPASSES
+COMPASS IST8310 I2C:ALL_EXTERNAL:0x0E true  ROTATION_ROLL_180_YAW_90
+
 define HAL_COMPASS_DEFAULT HAL_COMPASS_NONE
 define HAL_COMPASS_AUTO_ROT_DEFAULT 2
 
