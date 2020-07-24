@@ -50,7 +50,7 @@ void Rover::crash_check()
 
         if (is_balancebot()) {
             // send message to gcs
-            gcs().send_text(MAV_SEVERITY_EMERGENCY, "Crash: Disarming");
+            gcs().send_text(MAV_SEVERITY_EMERGENCY, "[16000]Crash: Disarming");
             arming.disarm();
         } else {
             // send message to gcs

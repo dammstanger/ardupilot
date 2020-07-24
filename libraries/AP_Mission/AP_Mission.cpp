@@ -54,7 +54,7 @@ void AP_Mission::init()
 
     // If Mission Clear bit is set then it should clear the mission, otherwise retain the mission.
     if (AP_MISSION_MASK_MISSION_CLEAR & _options) {
-    	gcs().send_text(MAV_SEVERITY_INFO, "Clearing Mission");
+    	gcs().send_text(MAV_SEVERITY_INFO, "[14600]Clearing Mission");
     	clear();	
     }
 
@@ -1814,11 +1814,11 @@ bool AP_Mission::jump_to_landing_sequence(void)
             resume();
         }
 
-        gcs().send_text(MAV_SEVERITY_INFO, "Landing sequence start");
+        gcs().send_text(MAV_SEVERITY_INFO, "[14601]Landing sequence start");
         return true;
     }
 
-    gcs().send_text(MAV_SEVERITY_WARNING, "Unable to start landing sequence");
+    gcs().send_text(MAV_SEVERITY_WARNING, "[02400]Unable to start landing sequence");
     return false;
 }
 

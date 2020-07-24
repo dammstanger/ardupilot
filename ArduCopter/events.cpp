@@ -100,7 +100,7 @@ void Copter::handle_battery_failsafe(const char *type_str, const int8_t action)
         desired_action = Failsafe_Action_Land;
         gcs().send_text(MAV_SEVERITY_WARNING, "Battery Failsafe - Continuing Landing");
     } else {
-        gcs().send_text(MAV_SEVERITY_WARNING, "Battery Failsafe");
+        gcs().send_text(MAV_SEVERITY_WARNING, "[11200]Battery Failsafe");
     }
 
     // Battery FS options already use the Failsafe_Options enum. So use them directly.
@@ -286,10 +286,10 @@ void Copter::gpsglitch_check()
         ap.gps_glitching = gps_glitching;
         if (gps_glitching) {
             AP::logger().Write_Error(LogErrorSubsystem::GPS, LogErrorCode::GPS_GLITCH);
-            gcs().send_text(MAV_SEVERITY_CRITICAL,"GPS Glitch");
+            gcs().send_text(MAV_SEVERITY_CRITICAL,"[18200]GPS Glitch");
         } else {
             AP::logger().Write_Error(LogErrorSubsystem::GPS, LogErrorCode::ERROR_RESOLVED);
-            gcs().send_text(MAV_SEVERITY_CRITICAL,"GPS Glitch cleared");
+            gcs().send_text(MAV_SEVERITY_CRITICAL,"[18600]GPS Glitch cleared");
         }
     }
 }

@@ -361,7 +361,7 @@ void AP_BattMonitor::check_failsafes(void)
                     break;
             }
 
-            gcs().send_text(MAV_SEVERITY_WARNING, "Battery %d is %s %.2fV used %.0f mAh", i + 1, type_str,
+            gcs().send_text(MAV_SEVERITY_WARNING, "[11400]Battery %d is %s %.2fV used %.0f mAh", i + 1, type_str,
                             (double)voltage(i), (double)state[i].consumed_mah);
             _has_triggered_failsafe = true;
             AP_Notify::flags.failsafe_battery = true;

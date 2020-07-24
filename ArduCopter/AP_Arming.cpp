@@ -109,7 +109,7 @@ bool AP_Arming_Copter::ins_checks(bool display_failure)
 
         // get ekf attitude (if bad, it's usually the gyro biases)
         if (!pre_arm_ekf_attitude_check()) {
-            check_failed(ARMING_CHECK_INS, display_failure, "EKF attitude is bad");
+            check_failed(ARMING_CHECK_INS, display_failure, "[01400]EKF attitude is bad");
             ret = false;
         }
     }
@@ -126,7 +126,7 @@ bool AP_Arming_Copter::board_voltage_checks(bool display_failure)
     // check battery voltage
     if ((checks_to_perform == ARMING_CHECK_ALL) || (checks_to_perform & ARMING_CHECK_VOLTAGE)) {
         if (copter.battery.has_failsafed()) {
-            check_failed(ARMING_CHECK_VOLTAGE, display_failure, "Battery failsafe");
+            check_failed(ARMING_CHECK_VOLTAGE, display_failure, "[01205]Battery failsafe");
             return false;
         }
 
@@ -154,14 +154,14 @@ bool AP_Arming_Copter::parameter_checks(bool display_failure)
         if (copter.g.failsafe_throttle) {
             // check throttle min is above throttle failsafe trigger and that the trigger is above ppm encoder's loss-of-signal value of 900
             if (copter.channel_throttle->get_radio_min() <= copter.g.failsafe_throttle_value+10 || copter.g.failsafe_throttle_value < 910) {
-                check_failed(ARMING_CHECK_PARAMETERS, display_failure, "Check FS_THR_VALUE");
+                check_failed(ARMING_CHECK_PARAMETERS, display_failure, "[01206]Check FS_THR_VALUE");
                 return false;
             }
         }
 
         // lean angle parameter check
         if (copter.aparm.angle_max < 1000 || copter.aparm.angle_max > 8000) {
-            check_failed(ARMING_CHECK_PARAMETERS, display_failure, "Check ANGLE_MAX");
+            check_failed(ARMING_CHECK_PARAMETERS, display_failure, "[01207]Check ANGLE_MAX");
             return false;
         }
 
@@ -291,7 +291,7 @@ bool AP_Arming_Copter::pilot_throttle_checks(bool display_failure)
             #if FRAME_CONFIG == HELI_FRAME
             const char *failmsg = "Collective below Failsafe";
             #else
-            const char *failmsg = "Throttle below Failsafe";
+            const char *failmsg = "[01237]Throttle below Failsafe";
             #endif
             check_failed(ARMING_CHECK_RC, display_failure, "%s", failmsg);
             return false;
@@ -368,7 +368,7 @@ bool AP_Arming_Copter::gps_checks(bool display_failure)
 
     // warn about hdop separately - to prevent user confusion with no gps lock
     if (copter.gps.get_hdop() > copter.g.gps_hdop_good) {
-        check_failed(ARMING_CHECK_GPS, display_failure, "High GPS HDOP");
+        check_failed(ARMING_CHECK_GPS, display_failure, "[01212]High GPS HDOP");
         AP_Notify::flags.pre_arm_gps_check = false;
         return false;
     }
@@ -406,7 +406,7 @@ bool AP_Arming_Copter::pre_arm_terrain_check(bool display_failure)
     // To-Do: modify RTL return path to fly at or above the RTL_ALT and remove this check
 
     if (copter.rangefinder_state.enabled && (copter.g.rtl_altitude > copter.rangefinder.max_distance_cm_orient(ROTATION_PITCH_270))) {
-        check_failed(ARMING_CHECK_PARAMETERS, display_failure, "RTL_ALT above rangefinder max range");
+        check_failed(ARMING_CHECK_PARAMETERS, display_failure, "[01213]RTL_ALT above rangefinder max range");
         return false;
     }
 
@@ -443,7 +443,7 @@ bool AP_Arming_Copter::proximity_checks(bool display_failure) const
     if (copter.avoid.proximity_avoidance_enabled() && copter.g2.proximity.get_closest_object(angle_deg, distance)) {
         // display error if something is within 60cm
         if (distance <= 0.6f) {
-            check_failed(ARMING_CHECK_PARAMETERS, display_failure, "Proximity %d deg, %4.2fm", (int)angle_deg, (double)distance);
+            check_failed(ARMING_CHECK_PARAMETERS, display_failure, "[01405]Proximity %d deg, %4.2fm", (int)angle_deg, (double)distance);
             return false;
         }
     }
@@ -501,7 +501,7 @@ bool AP_Arming_Copter::mandatory_gps_checks(bool display_failure)
     nav_filter_status filt_status;
     if (ahrs.get_filter_status(filt_status)) {
         if (filt_status.flags.gps_glitching) {
-            check_failed(display_failure, "GPS glitching");
+            check_failed(display_failure, "[01209]GPS glitching");
             return false;
         }
     }
@@ -512,13 +512,13 @@ bool AP_Arming_Copter::mandatory_gps_checks(bool display_failure)
     Vector2f offset;
     ahrs.get_variances(vel_variance, pos_variance, hgt_variance, mag_variance, tas_variance, offset);
     if (copter.g.fs_ekf_thresh > 0 && mag_variance.length() >= copter.g.fs_ekf_thresh) {
-        check_failed(display_failure, "EKF compass variance");
+        check_failed(display_failure, "[01210]EKF compass variance");
         return false;
     }
 
     // check home and EKF origin are not too far
     if (copter.far_from_EKF_origin(ahrs.get_home())) {
-        check_failed(display_failure, "EKF-home variance");
+        check_failed(display_failure, "[01211]EKF-home variance");
         return false;
     }
 
@@ -555,7 +555,7 @@ bool AP_Arming_Copter::arm_checks(AP_Arming::Method method)
         const Compass &_compass = AP::compass();
         // check compass health
         if (!_compass.healthy()) {
-            check_failed(true, "Compass not healthy");
+            check_failed(true, "[01214]Compass not healthy");
             return false;
         }
     }
@@ -587,7 +587,7 @@ bool AP_Arming_Copter::arm_checks(AP_Arming::Method method)
         SRV_Channels::set_emergency_stop(false);
         // if we are using motor Estop switch, it must not be in Estop position
     } else if (rc().find_channel_for_option(RC_Channel::AUX_FUNC::MOTOR_ESTOP) && SRV_Channels::get_emergency_stop()){
-        gcs().send_text(MAV_SEVERITY_CRITICAL,"Arm: Motor Emergency Stopped");
+        gcs().send_text(MAV_SEVERITY_CRITICAL,"[01200]Arm: Motor Emergency Stopped");
         return false;
     }
 
@@ -631,13 +631,13 @@ bool AP_Arming_Copter::arm_checks(AP_Arming::Method method)
         if (!(method == AP_Arming::Method::MAVLINK && (control_mode == Mode::Number::GUIDED || control_mode == Mode::Number::GUIDED_NOGPS))) {
             // above top of deadband is too always high
             if (copter.get_pilot_desired_climb_rate(copter.channel_throttle->get_control_in()) > 0.0f) {
-                check_failed(ARMING_CHECK_RC, true, "%s too high", rc_item);
+                check_failed(ARMING_CHECK_RC, true, "[01216]%s too high", rc_item);
                 return false;
             }
             // in manual modes throttle must be at zero
             #if FRAME_CONFIG != HELI_FRAME
             if ((copter.flightmode->has_manual_throttle() || control_mode == Mode::Number::DRIFT) && copter.channel_throttle->get_control_in() > 0) {
-                check_failed(ARMING_CHECK_RC, true, "%s too high", rc_item);
+                check_failed(ARMING_CHECK_RC, true, "[01216]%s too high", rc_item);
                 return false;
             }
             #endif

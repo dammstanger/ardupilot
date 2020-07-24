@@ -135,7 +135,7 @@ bool AP_Arming_Rover::arm(AP_Arming::Method method, const bool do_arming_checks)
 
     change_arm_state();
 
-    gcs().send_text(MAV_SEVERITY_INFO, "Throttle armed");
+    gcs().send_text(MAV_SEVERITY_INFO, "[01600]Throttle armed");
 
     return true;
 }
@@ -156,7 +156,7 @@ bool AP_Arming_Rover::disarm(void)
     // only log if disarming was successful
     change_arm_state();
 
-    gcs().send_text(MAV_SEVERITY_INFO, "Throttle disarmed");
+    gcs().send_text(MAV_SEVERITY_INFO, "[01601]Throttle disarmed");
 
     return true;
 }
